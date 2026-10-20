@@ -248,7 +248,7 @@
 
   // ── 마스터 볼륨 노브(위아래로 드래그 · 휠 · 방향키) ───────
   const knob = $("volume-knob");
-  const faders = [...document.querySelectorAll(".fader.vol")]; // CHAN 1·2 페이더도 같은 볼륨을 움직인다
+  const faders = [...document.querySelectorAll(".fader.vol")]; // CHAN 1 페이더도 같은 볼륨을 움직인다
   let knobValue = 0;
   let commitTimer;
 
@@ -347,21 +347,25 @@
     });
   });
 
-  // ── 효과음: Web Audio로 그 자리에서 만든다(파일 없음). 체크를 풀면 끈다 ──
-  const sfxBox = $("sfx");
+  // ── 효과음: Web Audio로 그 자리에서 만든다(파일 없음). 오른쪽 위 SFX 버튼으로 켜고 끈다 ──
+  const sfxBtn = document.querySelector("[data-sfx]");
+  let sfxOn = true;
   try {
-    sfxBox.checked = localStorage.getItem("sfx") !== "off";
+    sfxOn = localStorage.getItem("sfx") !== "off";
   } catch {}
-  sfxBox.addEventListener("change", () => {
+  sfxBtn.setAttribute("aria-pressed", String(sfxOn));
+  sfxBtn.addEventListener("click", () => {
+    sfxOn = !sfxOn;
+    sfxBtn.setAttribute("aria-pressed", String(sfxOn));
     try {
-      localStorage.setItem("sfx", sfxBox.checked ? "on" : "off");
+      localStorage.setItem("sfx", sfxOn ? "on" : "off");
     } catch {}
   });
   let audioCtx;
 
   /** kind: "tick"(턴테이블 눈금) | "next" | "previous"(스크래치) */
   function sfx(kind) {
-    if (!sfxBox.checked) return;
+    if (!sfxOn) return;
     try {
       audioCtx ||= new AudioContext();
     } catch {
@@ -589,12 +593,6 @@
     b.addEventListener("click", async () => {
       queueVersion = undefined;
       await refresh();
-    })
-  );
-  document.querySelectorAll("[data-scroll]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const list = $("queue");
-      list.scrollBy({ top: Number(b.dataset.scroll) * list.clientHeight * 0.8, behavior: "smooth" });
     })
   );
 

@@ -62,9 +62,9 @@
 .deck-right { grid-area: right; }
 .center { container-type: inline-size; grid-area: center; display: flex; flex-direction: column; gap: 3cqi; min-width: 0; }
 
-/* ── 덱 상단: 탐색 패드 + 장식 노브 ─────────────────────── */
-.deck-top { display: flex; align-items: center; justify-content: space-between; gap: 3cqi; }
-.navpads { display: grid; grid-template-columns: repeat(2, auto); gap: 1.6cqi; }
+/* ── 덱 상단: 왼쪽 = EQ 노브, 오른쪽 = SFX. 높이를 맞춰 두 턴테이블 위치를 맞춘다 ── */
+.deck-top { display: flex; align-items: center; gap: 3cqi; min-height: 22cqi; }
+.deck-right .deck-top { justify-content: flex-end; }
 .knobs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4cqi 4cqi; flex: 1; max-width: 62cqi; }
 
 .knob-unit { display: flex; flex-direction: column; align-items: center; gap: .6cqi; }
@@ -232,7 +232,7 @@
 
 /* ── 덱 하단: 큰 버튼 + 패드 ───────────────────────────── */
 .deck-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 3cqi; }
-.bigbtns { display: flex; flex-direction: column; gap: 2.6cqi; }
+.deck-right .deck-bottom { min-height: 15cqi; } /* 왼쪽 큰 재생 버튼 높이만큼 — 양쪽 패드 높이를 맞춘다 */
 .bigbtn {
   width: 15cqi; aspect-ratio: 1; border-radius: 50%;
   border: .9cqi solid #2b2d31;
@@ -246,7 +246,6 @@
 }
 .bigbtn:active { transform: translateY(1px) scale(.98); }
 .bigbtn:focus-visible { outline: 3px solid var(--led-blue); outline-offset: 2px; }
-.bigbtn.cue  { color: var(--led-orange); border-color: color-mix(in srgb, var(--led-orange) 55%, #2b2d31); }
 .bigbtn.play { color: var(--led-green);  border-color: color-mix(in srgb, var(--led-green) 45%, #2b2d31); }
 .device[data-state="play"] .deck-left .bigbtn.play {
   box-shadow: 0 0 0 1px #0a0b0c, 0 0 18px color-mix(in srgb, var(--led-green) 55%, transparent), inset 0 0 10px color-mix(in srgb, var(--led-green) 40%, transparent);
@@ -266,7 +265,6 @@
   cursor: pointer;
   transition: transform .06s, box-shadow .15s, color .15s;
 }
-.pad.sq { min-width: 0; width: 8.5cqi; height: 7cqi; padding: 0; font-size: clamp(8px, 3.4cqi, 15px); }
 .pad:active { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
 .pad:focus-visible { outline: 2px solid var(--led-blue); outline-offset: 2px; }
 .pad.blue   { color: var(--led-blue);   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--led-blue) 70%, transparent), 0 2px 3px rgba(0,0,0,.5); }
@@ -274,6 +272,10 @@
 .pad[aria-pressed="true"] {
   color: #fff; background: linear-gradient(#a3221d, #6f1411);
   box-shadow: 0 0 12px color-mix(in srgb, var(--led-red) 60%, transparent), inset 0 1px 0 rgba(255,255,255,.2);
+}
+.pad.sfx[aria-pressed="true"] {
+  color: #fff; background: linear-gradient(#2f6fc4, #1d4a8a);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--led-blue) 60%, transparent), inset 0 1px 0 rgba(255,255,255,.2);
 }
 .pad.listen[aria-pressed="true"] {
   color: #062b05; background: linear-gradient(#8ef08a, #4fc24b);
@@ -360,8 +362,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* ── 믹서 ─────────────────────────────────────────────── */
 .mixer {
   display: grid;
-  grid-template-columns: 1fr 1fr .5fr 2.6fr .5fr 1fr 1fr;
-  grid-template-areas: "p1 c1 m1 mid m2 c2 p2" "x x x x x x x";
+  grid-template-columns: 1fr .5fr 2.6fr .5fr 1fr;
+  grid-template-areas: "c1 m1 mid m2 .";
   align-items: end; gap: 3cqi 2cqi;
   padding: 3cqi 1cqi 0;
   border-top: 1px solid rgba(0,0,0,.35);
@@ -406,17 +408,6 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .vol-lcd span { color: #5aa65a; font-size: .8em; }
 .vol-note { margin: 0; min-height: 1.2em; font-size: clamp(8px, 2.6cqi, 11px); color: #ffcc80; text-align: center; }
 
-.xfader { grid-area: x; display: flex; align-items: center; justify-content: center; gap: 3cqi; color: var(--ink-dim); padding-bottom: 1cqi; }
-.xfader-slot { position: relative; width: 46cqi; height: 2.2cqi; border-radius: 2px; background: #0b0c0d; box-shadow: inset 0 1px 2px #000; }
-.xfader-slot i {
-  position: absolute; left: 50%; top: 50%; width: 5cqi; height: 9cqi; transform: translate(-50%, -50%);
-  border-radius: 3px;
-  background:
-    linear-gradient(90deg, transparent 44%, #e9ebee 44% 56%, transparent 56%),
-    repeating-linear-gradient(90deg, #5d6066 0 1px, #34373b 1px 3px);
-  box-shadow: 0 3px 5px rgba(0,0,0,.6), 0 0 0 1px #111;
-}
-
 /* ── 좁은 화면: 화면·믹서를 위로, 두 덱을 아래 나란히 ───────── */
 @container console (max-width: 760px) {
   .device {
@@ -426,22 +417,18 @@ button:disabled { opacity: .45; cursor: not-allowed; }
     padding: 4cqi 3.5cqi;
   }
   .knobs { display: none; }
-  .deck-top { justify-content: center; }
+  .deck-top, .deck-right .deck-top { justify-content: center; min-height: 12cqi; } /* 노브는 숨기고 SFX 칸만큼 비워 둔다 */
   .screen { height: clamp(260px, 92cqi, 420px); }
   .jog-artist, .jog-title { display: none; }
   .jog-center .art { width: 40%; }
   .jog-time { font-size: clamp(8px, 6cqi, 14px); }
-  .mixer { grid-template-columns: .9fr .6fr 2.6fr .6fr .9fr; grid-template-areas: "c1 m1 mid m2 c2" "x x x x x"; }
-  .mixer > .fader.pitch { display: none; }
+  .mixer { grid-template-columns: .9fr .6fr 2.6fr .6fr .9fr; }
   .fader-slot { height: 26cqi; }
   .deck-bottom { flex-direction: column; align-items: center; }
-  .deck-right .deck-bottom { flex-direction: column-reverse; }
-  .bigbtns { flex-direction: row; }
+  .deck-right .deck-bottom { min-height: 39cqi; justify-content: flex-end; }
   .bigbtn { width: 24cqi; font-size: clamp(7px, 5cqi, 13px); }
   .jog-cmd { top: 14%; font-size: clamp(6px, 5cqi, 12px); padding: .3em .5em; }
   .pad { min-width: 20cqi; height: 12cqi; font-size: clamp(8px, 4.4cqi, 12px); }
-  .pad.sq { width: 18cqi; height: 12cqi; }
-  .navpads { grid-template-columns: repeat(4, auto); }
 }
 
 @media (prefers-reduced-motion: reduce) {
