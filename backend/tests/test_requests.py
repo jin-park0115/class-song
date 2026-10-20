@@ -108,7 +108,7 @@ def test_cancel_rules(as_user):
 
 
 def test_admin_review_approve(as_user):
-    """수용 테스트 9: 승인 → APPROVED 후 음원을 받기 시작한다. 받지 못하면 FAILED(READY 아님)."""
+    """수용 테스트 9: 승인 → APPROVED 이지만 음원이 없으면 READY 아님."""
     student = as_user("student01")
     rid = student.post("/api/requests", json={"url": URL, "comment": "신나요"}).json()["id"]
     as_user("student02").post("/api/requests", json={"url": URL})
@@ -122,11 +122,11 @@ def test_admin_review_approve(as_user):
 
     res = admin.post(f"/api/admin/requests/{rid}/review", json={"decision": "APPROVE"})
     assert res.json()["status"] == "APPROVED"
-    assert res.json()["track"]["media_status"] == "PROCESSING"
+    assert res.json()["track"]["media_status"] == "PENDING_ACQUISITION"
     assert admin.post(f"/api/admin/requests/{rid}/review", json={"decision": "APPROVE"}).status_code == 409
 
     tracks = as_user("student01").get("/api/tracks").json()["items"]
-    assert len(tracks) == 1 and tracks[0]["media_status"] == "FAILED"  # 테스트 다운로더는 오프라인
+    assert len(tracks) == 1 and tracks[0]["media_status"] != "READY"
     assert as_user("student01").get("/api/tracks", params={"status": "ready"}).json()["items"] == []
 
 

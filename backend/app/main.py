@@ -16,7 +16,6 @@ from app.services.ratelimit import RateLimiter
 def create_app(
     player_controller: PlayerController | None = None,
     metadata_fetcher: youtube.MetadataFetcher | None = None,
-    downloader: youtube.Downloader | None = None,
 ) -> FastAPI:
     settings = get_settings()
 
@@ -25,7 +24,6 @@ def create_app(
         app.state.metadata_fetcher = metadata_fetcher or (
             youtube.fetch_oembed if settings.youtube_metadata_enabled else youtube.disabled_fetcher
         )
-        app.state.downloader = downloader or youtube.download_audio
         # IP당 로그인 30회/5분, 회원가입 10회/시간
         app.state.login_limiter = RateLimiter(30, 300)
         app.state.signup_limiter = RateLimiter(10, 3600)

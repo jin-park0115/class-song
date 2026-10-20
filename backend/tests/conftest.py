@@ -1,5 +1,4 @@
 import os
-import shutil
 import tempfile
 
 # app 모듈을 가져오기 전에 테스트 DB·음원 경로를 지정해야 엔진·설정이 테스트용으로 만들어진다.
@@ -88,31 +87,10 @@ def fake_youtube():
     return FakeYouTube()
 
 
-class FakeDownloader:
-    """yt-dlp 대신. source 가 없으면 인터넷이 안 되는 것처럼 실패하고, 있으면 그 파일을 받은 것처럼 복사한다."""
-
-    def __init__(self):
-        self.source = None
-        self.calls: list[str] = []
-
-    def __call__(self, video_id: str, dest_dir):
-        self.calls.append(video_id)
-        if self.source is None:
-            raise RuntimeError("offline")
-        out = dest_dir / f".incoming-{video_id}.mp3"
-        shutil.copyfile(self.source, out)
-        return out
-
-
 @pytest.fixture
-def fake_downloader():
-    return FakeDownloader()
-
-
-@pytest.fixture
-def client(fake_mpd, fake_youtube, fake_downloader):
+def client(fake_mpd, fake_youtube):
     player = PlayerController("fake", 0, client_factory=fake_mpd.factory)
-    with TestClient(create_app(player, metadata_fetcher=fake_youtube, downloader=fake_downloader)) as c:
+    with TestClient(create_app(player, metadata_fetcher=fake_youtube)) as c:
         yield c
 
 

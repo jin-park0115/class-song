@@ -1,28 +1,20 @@
-"""곡 신청(FR-002~004). 승인하면 YouTube에서 오디오를 받아(mp3) 재생 대기열 끝에 넣는다."""
+"""곡 신청(FR-002~004). YouTube URL은 곡 식별·검토 용도로만 쓰고 영상을 내려받지 않는다."""
 
-import hashlib
-import logging
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, FastAPI, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.api.player import Player
 from app.api.views import request_out, track_out
 from app.auth.deps import DB, ActiveUser, AdminUser
-from app.config import get_settings
-from app.db import SessionLocal
 from app.errors import ApiError
 from app.models import REJECT_REASONS, SongRequest, Track, User
-from app.services import audit, media, youtube
-from app.services.player import PlayerError
+from app.services import audit, youtube
 from app.services.settings import get_int_setting
 
-log = logging.getLogger("jukebox.requests")
 router = APIRouter(tags=["requests"])
 
 ACTIVE = ("PENDING", "APPROVED")
@@ -205,56 +197,8 @@ def admin_requests(
     }
 
 
-def _queue(app: FastAPI, track: Track) -> None:
-    """대기열 끝에 넣는다. MPD가 꺼져 있어도 승인·다운로드는 유지하고 라이브러리에서 다시 넣으면 된다."""
-    try:
-        app.state.player.add_to_queue(track.media_path)
-    except PlayerError as exc:
-        log.warning("queue add failed track_id=%s code=%s", track.id, exc.code)
-
-
-def _acquire(app: FastAPI, track_id: int, admin_id: int) -> None:
-    """(백그라운드) YouTube에서 오디오를 받아 mp3로 저장 → READY → 대기열 끝에 추가. 실패하면 FAILED."""
-    media_dir = Path(get_settings().media_dir)
-    with SessionLocal() as db:
-        track = db.get(Track, track_id)
-        try:
-            tmp = app.state.downloader(track.youtube_video_id, media_dir)
-            try:
-                duration = media.probe(tmp, "mp3")
-                with tmp.open("rb") as f:
-                    digest = hashlib.file_digest(f, "sha256").hexdigest()
-                relpath = media.finalize(tmp, media_dir, track.id, "mp3", track.media_path)
-            except BaseException:
-                tmp.unlink(missing_ok=True)
-                raise
-            track.media_path = relpath
-            track.sha256 = digest
-            track.duration_seconds = track.duration_seconds or duration
-            # READY 는 권리 확인이 필요하므로(DB 제약), 승인한 관리자를 확인자로 남긴다
-            track.rights_status = "CONFIRMED"
-            track.rights_basis = "OTHER"
-            track.rights_note = "신청 승인 시 YouTube에서 자동으로 받음"
-            track.rights_checked_by = admin_id
-            track.rights_checked_at = datetime.now(UTC)
-            track.media_status = "READY"
-            audit.record(db, admin_id, "tracks.download", {"track_id": track.id, "path": relpath, "sha256": digest})
-            db.commit()
-        except Exception as exc:
-            log.warning("download failed track_id=%s err=%s", track_id, exc)
-            db.rollback()
-            track = db.get(Track, track_id)
-            track.media_status = "FAILED"  # 라이브러리에서 파일을 직접 올리면 READY 가 된다
-            audit.record(db, admin_id, "tracks.download", {"track_id": track_id, "error": str(exc)[:300]})
-            db.commit()
-            return
-        _queue(app, track)
-
-
 @router.post("/api/admin/requests/{request_id}/review")
-def review(
-    request_id: int, body: ReviewIn, admin: AdminUser, db: DB, request: Request, tasks: BackgroundTasks
-) -> dict:
+def review(request_id: int, body: ReviewIn, admin: AdminUser, db: DB) -> dict:
     req = db.get(SongRequest, request_id)
     if req is None:
         raise ApiError(404, "NOT_FOUND", "신청을 찾을 수 없습니다.")
@@ -262,15 +206,11 @@ def review(
         raise ApiError(409, "INVALID_TRANSITION", "승인 대기 중인 신청만 검토할 수 있습니다.")
     req.reviewed_by = admin.id
     req.reviewed_at = datetime.now(UTC)
-    queue_now = False
     if body.decision == "APPROVE":
         req.status = "APPROVED"
-        track = req.track
-        if track.media_status == "READY":  # 이미 받아 둔 곡은 바로 대기열로
-            queue_now = True
-        elif track.media_status in ("NOT_AVAILABLE", "PENDING_ACQUISITION", "FAILED"):
-            track.media_status = "PROCESSING"
-            tasks.add_task(_acquire, request.app, track.id, admin.id)
+        # 승인 ≠ 재생 가능. 음원 확보 대기열로 보낸다(요구사항 6장).
+        if req.track.media_status == "NOT_AVAILABLE":
+            req.track.media_status = "PENDING_ACQUISITION"
     else:
         req.status = "REJECTED"
         req.reject_reason = body.reject_reason
@@ -282,21 +222,4 @@ def review(
         {"request_id": req.id, "decision": body.decision, "reason": body.reject_reason},
     )
     db.commit()
-    if queue_now:
-        _queue(request.app, req.track)
     return request_out(req, requester=req.user)
-
-
-@router.post("/api/admin/tracks/{track_id}/download")
-def redownload(track_id: int, admin: AdminUser, db: DB, request: Request, tasks: BackgroundTasks) -> dict:
-    """받기에 실패했거나 멈춘 곡(서버 재시작 등)을 다시 받는다. 받으면 대기열 끝에 들어간다."""
-    track = db.get(Track, track_id)
-    if track is None:
-        raise ApiError(404, "NOT_FOUND", "곡을 찾을 수 없습니다.")
-    if track.media_status in ("READY", "BLOCKED") or not track.youtube_video_id:
-        raise ApiError(409, "INVALID_TRANSITION", "다시 받을 수 없는 곡입니다.")
-    # ponytail: 실제로 받는 중에 또 누르면 두 번 받는다(같은 파일로 덮어써서 결과는 같다)
-    track.media_status = "PROCESSING"
-    db.commit()
-    tasks.add_task(_acquire, request.app, track.id, admin.id)
-    return track_out(track, admin=True)

@@ -134,8 +134,6 @@ def upload_media(track_id: int, file: UploadFile, admin: AdminUser, db: DB) -> d
 def delete_track(track_id: int, admin: AdminUser, player: Player, db: DB) -> dict:
     """곡을 지운다: 대기열에서 빼고, 이 곡의 신청 기록·음원 파일까지 지운다."""
     track = _track(db, track_id)
-    if track.media_status == "PROCESSING":
-        raise ApiError(409, "TRACK_PROCESSING", "음원을 받는 중이에요. 끝난 뒤에 지우세요.")
     media_path = track.media_path
     if media_path:
         try:

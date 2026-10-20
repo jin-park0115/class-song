@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.config import get_settings
 from app.models import Track
@@ -179,53 +180,31 @@ def test_add_ready_track_to_queue_shows_db_title(as_user, approved_track, tone_f
     assert admin.delete("/api/admin/queue/0").status_code == 422
 
 
-def test_approve_downloads_and_queues(as_user, tone_files, fake_downloader, fake_mpd, db):
-    """승인 → YouTube에서 받아 READY → 대기열 끝. 같은 곡을 또 승인하면 다시 받지 않고 바로 넣는다."""
-    fake_downloader.source = tone_files[0]
-    fake_mpd.songs = []
-    a = as_user("student01").post("/api/requests", json={"url": URL}).json()["id"]
-    b = as_user("student02").post("/api/requests", json={"url": URL}).json()["id"]
-    admin = as_user("admin01", role="ADMIN")
-
-    admin.post(f"/api/admin/requests/{a}/review", json={"decision": "APPROVE"})
-    track = db.scalar(select(Track))
-    assert track.media_status == "READY" and track.rights_status == "CONFIRMED" and track.duration_seconds == 3
-    assert sorted(p.name for p in MEDIA.iterdir()) == [f"{track.id}.mp3"]
-    assert len(admin.get("/api/player/queue").json()["items"]) == 1
-
-    admin.post(f"/api/admin/requests/{b}/review", json={"decision": "APPROVE"})
-    assert fake_downloader.calls == ["dQw4w9WgXcQ"]
-    assert len(admin.get("/api/player/queue").json()["items"]) == 2
-
-
-def test_redownload_failed_track(as_user, approved_track, tone_files, fake_downloader, fake_mpd):
-    """받기 실패(FAILED) → 다시 받기 → READY, 대기열 끝. READY 곡은 다시 받을 수 없다."""
-    admin = as_user("admin01")
-    assert admin.get("/api/admin/tracks").json()["items"][0]["media_status"] == "FAILED"
-    fake_downloader.source = tone_files[0]
-    queued = len(fake_mpd.songs)
-    assert admin.post(f"/api/admin/tracks/{approved_track}/download").status_code == 200
-    assert admin.get("/api/admin/tracks").json()["items"][0]["media_status"] == "READY"
-    assert len(fake_mpd.songs) == queued + 1
-    assert admin.post(f"/api/admin/tracks/{approved_track}/download").status_code == 409
-
-
-def test_delete_track(as_user, tone_files, fake_downloader, fake_mpd, db):
+def test_delete_track(as_user, approved_track, tone_files, fake_mpd, db):
     """삭제 → 대기열·파일·신청 기록·곡이 모두 사라진다."""
-    fake_downloader.source = tone_files[0]
-    rid = as_user("student01").post("/api/requests", json={"url": URL}).json()["id"]
-    admin = as_user("admin01", role="ADMIN")
-    admin.post(f"/api/admin/requests/{rid}/review", json={"decision": "APPROVE"})
-    track_id = db.scalar(select(Track.id))
+    admin = as_user("admin01")
+    confirm(admin, approved_track)
+    upload(admin, approved_track, tone_files[0])
+    admin.post("/api/admin/queue", json={"track_id": approved_track})
     queued = len(fake_mpd.songs)
 
-    assert admin.delete(f"/api/admin/tracks/{track_id}").status_code == 200
-    assert len(fake_mpd.songs) == queued - 1 and all(s["file"] != f"{track_id}.mp3" for s in fake_mpd.songs)
+    assert admin.delete(f"/api/admin/tracks/{approved_track}").status_code == 200
+    assert len(fake_mpd.songs) == queued - 1 and all(s["file"] != f"{approved_track}.mp3" for s in fake_mpd.songs)
     assert list(MEDIA.iterdir()) == []
     assert admin.get("/api/admin/tracks").json()["items"] == []
     assert as_user("student01").get("/api/requests/me").json()["items"] == []
-    assert as_user("admin01").delete(f"/api/admin/tracks/{track_id}").status_code == 404
-    assert as_user("student01").delete("/api/admin/tracks/1").status_code == 403
+    assert as_user("admin01").delete(f"/api/admin/tracks/{approved_track}").status_code == 404
+    assert as_user("student01").delete(f"/api/admin/tracks/{approved_track}").status_code == 403
+
+
+def test_ready_requires_confirmed_rights_in_db(approved_track, db):
+    """요구사항 4.3: 권리가 확인되지 않은 곡은 어떤 경로로도 READY 가 될 수 없다(DB 제약)."""
+    track = db.get(Track, approved_track)
+    assert track.rights_status == "UNKNOWN"
+    track.media_status = "READY"
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
 
 
 def test_queue_not_ready(as_user, approved_track):

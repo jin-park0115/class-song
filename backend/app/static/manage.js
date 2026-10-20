@@ -125,7 +125,7 @@
           ? { decision }
           : { decision, reject_reason: reason.value, reject_note: note.value || null });
         await refreshAll();
-      }, decision === "APPROVE" ? `'${t.title}' 승인 — 음원을 받아 대기열 끝에 넣고 있어요. 실패하면 음원 라이브러리에서 직접 올리세요.` : `'${t.title}' 반려했어요.`);
+      }, decision === "APPROVE" ? `'${t.title}' 승인 — 음원 라이브러리에서 이용 권리를 확인하고 음원을 준비하세요.` : `'${t.title}' 반려했어요.`);
       const pendingActions = r.status === "PENDING" ? el("div", { class: "review" },
         el("button", { class: "btn small primary", onclick: () => review("APPROVE") }, "승인"),
         reason, note,
@@ -175,20 +175,8 @@
         await refreshAll();
       }, `'${t.title}' 음원 등록 완료 — 이제 대기열에 넣을 수 있어요.`) }, t.has_media ? "다시 올리기" : "올리기");
 
-      const queueBtn = el("button", { class: "btn small primary", onclick: () => run(
-        () => api.post("/api/admin/queue", { track_id: t.id }), `'${t.title}'을(를) 재생 대기열 끝에 넣었어요.`) }, "＋ 대기열에 다시 넣기");
-      const retryBtn = el("button", { class: "btn small primary", onclick: () => run(async () => {
-        await api.post(`/api/admin/tracks/${t.id}/download`);
-        await refreshAll();
-      }, `'${t.title}' 다시 받는 중이에요.`) }, "다시 받기");
-
-      const rightsStep = el("li", {}, el("b", {}, "① 이용 권리 "),
-        el("div", { class: "step-row" }, basis, note,
-          el("button", { class: "btn small", onclick: () => setRights("CONFIRMED") }, "확인"),
-          el("button", { class: "btn small", onclick: () => setRights("DENIED") }, "사용 불가")));
-      const uploadStep = el("li", {}, el("b", {}, "② 음원 파일 "),
-        el("div", { class: "step-row" }, file, uploadBtn,
-          t.rights_status !== "CONFIRMED" ? el("span", { class: "muted small" }, "권리 확인 후 올릴 수 있어요") : null));
+      const queueBtn = el("button", { class: "btn small primary", disabled: t.media_status !== "READY", onclick: () => run(
+        () => api.post("/api/admin/queue", { track_id: t.id }), `'${t.title}'을(를) 재생 대기열 끝에 넣었어요.`) }, "＋ 대기열에 추가");
 
       const removeBtn = el("button", { class: "btn small", "aria-label": `${t.title} 삭제`, onclick: () => {
         if (!confirm(`'${t.title}'을(를) 지울까요?\n대기열에서 빠지고, 음원 파일과 학생들의 신청 기록도 함께 지워져요.`)) return;
@@ -206,25 +194,16 @@
             el("p", { class: "small muted" }, [t.artist_or_channel, fmtDur(t.duration_seconds)].filter(Boolean).join(" · ")),
             t.source_url ? el("a", { href: t.source_url, target: "_blank", rel: "noopener", class: "small" }, "YouTube ↗") : null),
           el("div", { class: "tl-side" }, badge(t.rights_status), badge(t.media_status), removeBtn)),
-        actionsFor(t, queueBtn, retryBtn, rightsStep, uploadStep));
+        el("ol", { class: "steps" },
+          el("li", {}, el("b", {}, "① 이용 권리 "),
+            el("div", { class: "step-row" }, basis, note,
+              el("button", { class: "btn small", onclick: () => setRights("CONFIRMED") }, "확인"),
+              el("button", { class: "btn small", onclick: () => setRights("DENIED") }, "사용 불가"))),
+          el("li", {}, el("b", {}, "② 음원 파일 "),
+            el("div", { class: "step-row" }, file, uploadBtn,
+              t.rights_status !== "CONFIRMED" ? el("span", { class: "muted small" }, "권리 확인 후 올릴 수 있어요") : null)),
+          el("li", {}, el("b", {}, "③ 재생 "), el("div", { class: "step-row" }, queueBtn))));
     }));
-    // 받는 중인 곡이 있으면 끝날 때까지 3초마다 다시 불러온다
-    clearTimeout(libraryTimer);
-    if (res.items.some((t) => t.media_status === "PROCESSING")) libraryTimer = setTimeout(() => run(refreshAll), 3000);
-  }
-  let libraryTimer;
-
-  /** 곡 상태에 필요한 조작만 보여준다. 직접 올리기(①②)는 받기에 실패한 곡의 예비 수단이다. */
-  function actionsFor(t, queueBtn, retryBtn, rightsStep, uploadStep) {
-    const row = (...kids) => el("div", { class: "step-row" }, ...kids);
-    switch (t.media_status) {
-      case "READY": return row(queueBtn);
-      case "PROCESSING": return row(el("span", { class: "muted small" }, "YouTube에서 음원을 받는 중…"));
-      case "BLOCKED": return el("ol", { class: "steps" }, rightsStep);
-      default: return el("div", {},
-        row(retryBtn, el("span", { class: "muted small" }, t.media_status === "FAILED" ? "음원을 받지 못했어요." : "")),
-        el("details", {}, el("summary", { class: "small" }, "직접 올리기"), el("ol", { class: "steps" }, rightsStep, uploadStep)));
-    }
   }
 
   async function refreshAll() {
