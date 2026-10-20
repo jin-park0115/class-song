@@ -16,9 +16,11 @@ COPY migrations ./migrations
 COPY app ./app
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# Windows에서 받은 저장소라 줄바꿈이 CRLF여도 시작 스크립트가 동작하도록 CR을 지운다.
 # 음원 디렉터리는 MPD 컨테이너와 공유한다. 파일은 0644로 저장되어 MPD가 읽을 수 있다.
 RUN useradd --uid 1000 --create-home jukebox \
  && mkdir -p /srv/ax2-jukebox/media && chown jukebox:jukebox /srv/ax2-jukebox/media \
+ && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
  && chmod +x /usr/local/bin/docker-entrypoint.sh
 USER jukebox
 

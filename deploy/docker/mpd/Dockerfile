@@ -5,6 +5,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /var/lib/mpd /run/mpd && chown -R mpd:audio /var/lib/mpd /run/mpd
 COPY mpd.conf /etc/mpd.conf
+RUN sed -i 's/\r$//' /etc/mpd.conf
 USER mpd
 EXPOSE 6600 8001
 CMD ["mpd", "--no-daemon", "--stderr", "/etc/mpd.conf"]
