@@ -265,6 +265,7 @@
 
   // ── 마스터 볼륨 노브(위아래로 드래그 · 휠 · 방향키) ───────
   const knob = $("volume-knob");
+  const faders = [...document.querySelectorAll(".fader.vol")]; // CHAN 1·2 페이더도 같은 볼륨을 움직인다
   let knobValue = 0;
   let commitTimer;
 
@@ -275,6 +276,12 @@
     knob.setAttribute("aria-valuemax", String(max));
     knob.setAttribute("aria-valuenow", String(knobValue));
     knob.setAttribute("aria-valuetext", `${knobValue}%`);
+    faders.forEach((f) => {
+      f.querySelector(".fader-cap").style.setProperty("--p", 1 - knobValue / 100);
+      f.setAttribute("aria-valuemax", String(max));
+      f.setAttribute("aria-valuenow", String(knobValue));
+      f.setAttribute("aria-valuetext", `${knobValue}%`);
+    });
     $("volume-value").textContent = status && status.volume == null ? "—" : `${knobValue}%`;
   }
 
@@ -312,17 +319,85 @@
   };
   knob.addEventListener("pointerup", endDrag);
   knob.addEventListener("pointercancel", endDrag);
-  knob.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    nudge(e.deltaY < 0 ? 1 : -1);
-  }, { passive: false });
-  knob.addEventListener("keydown", (e) => {
-    const step = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, PageUp: 5, PageDown: -5 }[e.key];
-    if (step) nudge(step);
-    else if (e.key === "Home") nudge(-knobValue, 0);
-    else if (e.key === "End") nudge(status.max_volume - knobValue, 0);
-    else return;
-    e.preventDefault();
+
+  // 페이더: 누른 높이가 곧 볼륨(위 = 100%, 상한에서 멈춤)
+  let faderDrag = false;
+  const faderAt = (f, e) => {
+    const r = f.querySelector(".fader-slot").getBoundingClientRect();
+    setKnob(Math.round((1 - (e.clientY - r.top) / r.height) * 100), status.max_volume);
+  };
+  faders.forEach((f) => {
+    f.addEventListener("pointerdown", (e) => {
+      if (!status || status.volume == null) return;
+      f.setPointerCapture(e.pointerId);
+      f.focus();
+      faderDrag = true;
+      volumeEditing = true;
+      clearTimeout(commitTimer);
+      faderAt(f, e);
+    });
+    f.addEventListener("pointermove", (e) => faderDrag && faderAt(f, e));
+    const end = async () => {
+      if (!faderDrag) return;
+      faderDrag = false;
+      await control({ action: "volume", value: knobValue });
+      volumeEditing = false;
+    };
+    f.addEventListener("pointerup", end);
+    f.addEventListener("pointercancel", end);
+  });
+
+  [knob, ...faders].forEach((el) => {
+    el.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      nudge(e.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
+    el.addEventListener("keydown", (e) => {
+      const step = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, PageUp: 5, PageDown: -5 }[e.key];
+      if (step) nudge(step);
+      else if (e.key === "Home") nudge(-knobValue, 0);
+      else if (e.key === "End") nudge(status.max_volume - knobValue, 0);
+      else return;
+      e.preventDefault();
+    });
+  });
+
+  // ── 턴테이블: 잡고 JOG_DEG 만큼 돌리면 왼쪽 = 이전 곡, 오른쪽 = 다음 곡(한 번 잡을 때 한 곡) ──
+  const JOG_DEG = 45; // 손맛에 맞게 조정
+  document.querySelectorAll(".jog").forEach((jog) => {
+    const action = jog.id === "jog-right" ? "next" : "previous";
+    let rot = 0;
+    let last = null;
+    let turned = 0;
+    const angle = (e) => {
+      const r = jog.getBoundingClientRect();
+      return (Math.atan2(e.clientY - r.top - r.height / 2, e.clientX - r.left - r.width / 2) * 180) / Math.PI;
+    };
+    jog.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return; // 가운데 NEXT/PREVIOUS 글자 버튼은 그대로 클릭
+      jog.setPointerCapture(e.pointerId);
+      last = angle(e);
+      turned = 0;
+    });
+    jog.addEventListener("pointermove", (e) => {
+      if (last == null) return;
+      const a = angle(e);
+      const d = ((a - last + 540) % 360) - 180; // ±180° 경계를 넘어도 이어지게
+      last = a;
+      rot += d;
+      jog.style.setProperty("--rot", `${rot}deg`);
+      if (turned === null) return; // 이번 잡기에서 이미 넘김
+      turned += d;
+      if (Math.abs(turned) >= JOG_DEG) {
+        turned = null;
+        jog.classList.add("fired");
+        setTimeout(() => jog.classList.remove("fired"), 300);
+        control({ action });
+      }
+    });
+    const release = () => (last = null);
+    jog.addEventListener("pointerup", release);
+    jog.addEventListener("pointercancel", release);
   });
 
   // ── 버튼 연결 ──────────────────────────────────────

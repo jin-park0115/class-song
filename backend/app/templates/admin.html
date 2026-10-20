@@ -16,7 +16,9 @@
 </div>
 {%- endmacro %}
 {% macro fader(label, pos, area, cls="") -%}
-<div class="fader {{ cls }}" style="grid-area: {{ area }}" aria-hidden="true">
+{% if cls == "vol" %}<div class="fader vol" style="grid-area: {{ area }}" role="slider" tabindex="0"
+     aria-label="{{ label }} 볼륨" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+{% else %}<div class="fader {{ cls }}" style="grid-area: {{ area }}" aria-hidden="true">{% endif %}
   {% if label %}<span class="fader-label">{{ label }}</span>{% endif %}
   <div class="fader-slot"><i class="fader-cap" style="--p: {{ pos }}"></i></div>
 </div>
@@ -97,7 +99,7 @@
 
       <div class="mixer">
         {{ fader("", 0.35, "p1", "pitch") }}
-        {{ fader("CHAN 1", 0.3, "c1") }}
+        {{ fader("CHAN 1", 1, "c1", "vol") }}
         <div class="meter" style="grid-area: m1" aria-hidden="true">{% for i in range(10) %}<i></i>{% endfor %}</div>
         <div class="mixer-mid">
           <span class="knob-label">MASTER VOL</span>
@@ -110,7 +112,7 @@
           <p class="vol-note" id="volume-note" aria-live="polite"></p>
         </div>
         <div class="meter r" style="grid-area: m2" aria-hidden="true">{% for i in range(10) %}<i></i>{% endfor %}</div>
-        {{ fader("CHAN 2", 0.3, "c2") }}
+        {{ fader("CHAN 2", 1, "c2", "vol") }}
         {{ fader("", 0.6, "p2", "pitch") }}
         <div class="xfader" aria-hidden="true"><span>‹</span><div class="xfader-slot"><i></i></div><span>›</span></div>
       </div>
@@ -171,7 +173,8 @@
   <p class="legend muted small">
     상태: <b id="state-text">확인 중…</b> ·
     출력 <span id="outputs-legend">—</span> ·
-    GAIN·TREBLE·BASS 등 회색 노브는 장식이며 동작하지 않습니다.
+    턴테이블을 45° 돌리면 왼쪽은 이전 곡, 오른쪽은 다음 곡 ·
+    CHAN 페이더 = 볼륨 · 회색 노브·PITCH·크로스페이더는 장식입니다.
     {% if monitor_stream_url %}· LISTEN: 이 기기로 듣기(몇 초 늦게 들려요){% endif %}
   </p>
 </div>

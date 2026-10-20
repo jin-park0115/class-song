@@ -165,6 +165,11 @@
   pointer-events: none;
 }
 .device[data-state="play"] #jog-left .jog-platter { animation-play-state: running; }
+/* 손으로 돌리기: rotate 속성은 transform 애니메이션과 따로 합쳐진다 */
+.jog { touch-action: none; user-select: none; cursor: grab; }
+.jog:active { cursor: grabbing; }
+.jog-ring, .jog-platter { rotate: var(--rot, 0deg); }
+.jog.fired { box-shadow: 0 0 0 3px var(--led-blue), 0 10px 24px rgba(0,0,0,.55); }
 @keyframes jog-spin { to { transform: rotate(360deg); } }
 
 .jog-cmd {
@@ -347,6 +352,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
 }
 .fader { display: flex; flex-direction: column; align-items: center; gap: 1.5cqi; }
+.fader.vol { cursor: ns-resize; touch-action: none; outline: none; }
+.fader.vol:focus-visible .fader-cap { box-shadow: 0 0 0 3px var(--led-blue); }
 .fader-label { font-size: clamp(6px, 2.4cqi, 10px); color: var(--ink-dim); font-weight: 600; white-space: nowrap; }
 .fader-slot {
   position: relative; width: 2.2cqi; height: 34cqi;
