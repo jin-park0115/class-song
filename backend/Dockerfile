@@ -5,7 +5,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH=/opt/venv/bin:$PATH
 
-RUN pip install --no-cache-dir uv==0.11.32
+# ffmpeg: yt-dlp가 받은 오디오를 mp3로 바꿀 때 쓴다
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --no-cache-dir uv==0.11.32
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./

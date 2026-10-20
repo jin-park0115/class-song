@@ -8,10 +8,15 @@
 <span id="who" class="muted"></span>
 <button id="logout" class="btn small">로그아웃</button>
 {% endblock %}
-{% macro knob(label, v) -%}
-<div class="knob-unit" aria-hidden="true">
+{% macro knob(label, v, eq=none) -%}
+{# eq 가 있으면 LISTEN 소리를 바꾸는 진짜 노브(admin.js 이퀄라이저), 없으면 장식 #}
+{% if eq %}<div class="knob-unit">
   <span class="knob-label">{{ label }}</span>
-  <div class="knob" style="--v: {{ v }}"><i class="knob-cap"></i></div>
+  <div class="knob" style="--v: .5" data-eq="{{ label|lower }}" role="slider" tabindex="0"
+       aria-label="{{ label }} (LISTEN 소리)" aria-valuemin="-12" aria-valuemax="12" aria-valuenow="0"><i class="knob-cap"></i></div>
+{% else %}<div class="knob-unit" aria-hidden="true">
+  <span class="knob-label">{{ label }}</span>
+  <div class="knob" style="--v: {{ v }}"><i class="knob-cap"></i></div>{% endif %}
   <span class="knob-scale"><b>-</b><b>+</b></span>
 </div>
 {%- endmacro %}
@@ -38,7 +43,7 @@
           <button class="pad sq" data-action="next" aria-label="다음 곡">⏭</button>
         </div>
         <div class="knobs">
-          {{ knob("GAIN", 0.5) }}{{ knob("TREBLE", 0.55) }}{{ knob("BASS", 0.45) }}
+          {{ knob("GAIN", 0.5, monitor_stream_url) }}{{ knob("TREBLE", 0.55, monitor_stream_url) }}{{ knob("BASS", 0.45, monitor_stream_url) }}
           {{ knob("GAIN", 0.5) }}{{ knob("TREBLE", 0.5) }}{{ knob("BASS", 0.6) }}
         </div>
       </div>
@@ -47,6 +52,7 @@
         <div class="jog-ring"></div>
         <div class="jog-platter"><i class="jog-notch"></i></div>
         <div class="jog-sheen"></div>
+        <div class="jog-meter" aria-hidden="true"></div>
         <button class="jog-cmd" data-action="previous" aria-label="이전 곡">◀ PREVIOUS</button>
         <div class="jog-center">
           <svg class="jog-progress" viewBox="0 0 100 100" aria-hidden="true">
@@ -137,6 +143,7 @@
         <div class="jog-ring"></div>
         <div class="jog-platter"><i class="jog-notch"></i></div>
         <div class="jog-sheen"></div>
+        <div class="jog-meter" aria-hidden="true"></div>
         <button class="jog-cmd" data-action="next" aria-label="다음 곡">NEXT ▶</button>
         <div class="jog-center">
           <svg class="jog-progress" viewBox="0 0 100 100" aria-hidden="true">
@@ -145,7 +152,7 @@
           <span class="jog-artist">NEXT</span>
           <span class="art" id="right-art"></span>
           <span class="jog-title" id="right-title">없음</span>
-          <span class="jog-time" id="right-time" aria-label="예상 시작 시각">--:--</span>
+          <span class="jog-time" id="right-time" aria-label="다음 곡 길이">--:--</span>
         </div>
         <span class="jog-tag l" aria-hidden="true">MIN</span><span class="jog-tag r" aria-hidden="true">MAX</span>
       </div>
@@ -173,9 +180,12 @@
   <p class="legend muted small">
     상태: <b id="state-text">확인 중…</b> ·
     출력 <span id="outputs-legend">—</span> ·
-    턴테이블을 45° 돌리면 왼쪽은 이전 곡, 오른쪽은 다음 곡 ·
-    CHAN 페이더 = 볼륨 · 회색 노브·PITCH·크로스페이더는 장식입니다.
+    턴테이블을 90° 돌리면 왼쪽은 이전 곡, 오른쪽은 다음 곡 ·
+    CHAN 페이더 = 볼륨 ·
+    {% if monitor_stream_url %}왼쪽 위 GAIN·TREBLE·BASS 노브 = LISTEN 소리 조절(더블클릭하면 원래대로) · {% endif %}
+    나머지 회색 노브·PITCH·크로스페이더는 장식입니다.
     {% if monitor_stream_url %}· LISTEN: 이 기기로 듣기(몇 초 늦게 들려요){% endif %}
+    · <label><input type="checkbox" id="sfx" checked> 넘길 때 효과음</label>
   </p>
 </div>
 {% endblock %}

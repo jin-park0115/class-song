@@ -76,9 +76,10 @@
     if (p.my_request) notes.push(el("p", { class: "warn" }, `이미 신청한 곡이에요 (${label(p.my_request.status)}).`));
     for (const w of p.warnings) notes.push(el("p", { class: "warn" }, w));
 
-    const manual = p.metadata_found ? null : el("div", {},
+    // replaceChildren 은 null 을 "null" 글자로 찍으므로 빈 배열로 둔다
+    const manual = p.metadata_found ? [] : [el("div", {},
       el("label", { for: "manual-title" }, "곡명"),
-      el("input", { id: "manual-title", maxlength: 300, placeholder: "곡 정보를 불러오지 못했어요. 곡명을 적어주세요", required: true }));
+      el("input", { id: "manual-title", maxlength: 300, placeholder: "곡 정보를 불러오지 못했어요. 곡명을 적어주세요", required: true }))];
     const canSubmit = !p.blocked && !p.my_request;
 
     box.replaceChildren(
@@ -89,7 +90,7 @@
           el("p", { class: "muted small" }, p.channel || ""),
           el("a", { href: p.source_url, target: "_blank", rel: "noopener", class: "small" }, "YouTube에서 열기 ↗"))),
       ...notes,
-      manual,
+      ...manual,
       el("label", { for: "comment" }, "한마디 ", el("span", { class: "muted" }, "(선택)")),
       el("input", { id: "comment", maxlength: 300, placeholder: "예: 월요일 아침에 듣고 싶어요" }),
       el("button", { type: "submit", class: "btn primary wide", disabled: !canSubmit }, "이 곡 신청하기"));

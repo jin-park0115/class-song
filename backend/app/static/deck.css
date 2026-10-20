@@ -126,6 +126,8 @@
 }
 .knob.big .knob-cap::after { background: #1a1b1e; top: 6%; height: 26%; }
 .knob.big:focus-visible { box-shadow: 0 0 0 3px var(--led-blue); }
+.knob[data-eq] { cursor: ns-resize; touch-action: none; outline: none; }
+.knob[data-eq]:focus-visible { box-shadow: 0 0 0 3px var(--led-blue); }
 
 /* ── 조그 휠 ─────────────────────────────────────────── */
 .jog {
@@ -170,6 +172,20 @@
 .jog:active { cursor: grabbing; }
 .jog-ring, .jog-platter { rotate: var(--rot, 0deg); }
 .jog.fired { box-shadow: 0 0 0 3px var(--led-blue), 0 10px 24px rgba(0,0,0,.55); }
+/* 돌린 만큼 바깥 링이 차오른다(--p: 0~1, --from: 시작 각도). 판과 달리 회전하지 않는다 */
+.jog-meter {
+  position: absolute; inset: 3%;
+  border-radius: 50%;
+  background: conic-gradient(from var(--from, 0deg), rgba(91,155,255,.9) calc(var(--p, 0) * 360deg), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 84%, #000 85%);
+          mask: radial-gradient(circle, transparent 84%, #000 85%);
+  opacity: 0; transition: opacity .25s;
+  pointer-events: none;
+}
+.jog.turning .jog-meter { opacity: 1; transition: none; }
+
+/* 곡을 넘길 때 앨범 아트가 덱 사이를 날아간다(admin.js skipFx) */
+.art-fly { position: fixed; z-index: 50; margin: 0; pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
 @keyframes jog-spin { to { transform: rotate(360deg); } }
 
 .jog-cmd {

@@ -208,6 +208,16 @@ class PlayerController:
 
         self._call(_remove)
 
+    def remove_file(self, uri: str) -> None:
+        """대기열에서 이 파일을 모두 뺀다(뒤에서부터 지워야 위치가 안 밀린다)."""
+
+        def _remove(c: MPDClient) -> None:
+            for song in reversed(c.playlistinfo()):
+                if song.get("file") == uri:
+                    c.delete(int(song["pos"]))
+
+        self._call(_remove)
+
     # ---- 제어 -------------------------------------------------------------
 
     @staticmethod

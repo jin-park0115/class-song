@@ -18,7 +18,6 @@
     const s = Math.max(0, Math.floor(sec));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   };
-  const clock = (ms) => new Date(ms).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
   const songName = (s) => (s.artist ? `${s.artist} - ${s.title}` : s.title);
 
   function paintArt(el, song) {
@@ -133,6 +132,7 @@
       play.addEventListener("click", () => control({ action: "play_at", position: song.position }));
       const when = document.createElement("span");
       when.className = "when";
+      when.textContent = song.duration ? fmt(song.duration) : "";
       const remove = document.createElement("button");
       remove.className = "row-remove";
       remove.textContent = "✕";
@@ -144,7 +144,7 @@
     list.replaceChildren(...rows);
   }
 
-  /** 1초마다: 진행 링·남은 시간·예상 시작 시각 갱신 */
+  /** 1초마다: 진행 링·남은 시간 갱신 */
   function tick() {
     if (!status) return;
     const elapsed = liveElapsed();
@@ -152,27 +152,7 @@
     const pct = dur ? elapsed / dur : 0;
     $("left-ring").style.strokeDashoffset = String(RING * (1 - pct));
     $("left-time").textContent = status.current ? `-${fmt(dur - elapsed)}` : "-0:00";
-
-    const playing = status.state === "play" && status.current;
-    const cur = status.current ? status.current.position : null;
-    let t = Date.now() + (dur - elapsed) * 1000; // 현재 곡이 끝나는 시각
-    // 행마다 예상 시작 시각: 재생 중일 때만 현재 곡 이후를 누적 계산한다.
-    document.querySelectorAll("#queue li[data-pos]").forEach((li) => {
-      const pos = Number(li.dataset.pos);
-      const when = li.querySelector(".when");
-      if (cur != null && pos < cur) {
-        when.textContent = ""; // 이미 지나간 곡
-      } else if (pos === cur) {
-        when.textContent = playing ? clock(Date.now() - elapsed * 1000) : STATE_LABEL[status.state] || "";
-      } else if (playing) {
-        when.textContent = clock(t);
-        t += (queue[pos]?.duration || 0) * 1000;
-      } else {
-        when.textContent = "--:--";
-      }
-    });
-    const nextRow = status.next ? document.querySelector(`#queue li[data-pos="${status.next.position}"] .when`) : null;
-    $("right-time").textContent = playing && nextRow ? nextRow.textContent : "--:--";
+    $("right-time").textContent = status.next && status.next.duration ? fmt(status.next.duration) : "--:--";
   }
 
   // ── 서버 통신 ──────────────────────────────────────
@@ -183,7 +163,7 @@
   async function applyStatus(st) {
     const wasPlaying = status && status.state === "play";
     status = st;
-    if (monitor && listening && st.state === "play" && (!wasPlaying || monitor.paused)) connectMonitor();
+    if (monitor && listening && st.state === "play" && !wasPlaying) connectMonitor();
     statusAt = Date.now();
     if (st.connected && st.queue_version !== queueVersion) {
       queueVersion = st.queue_version;
@@ -202,6 +182,7 @@
   }
 
   async function control(body) {
+    if (body.action === "next" || body.action === "previous") skipFx(body.action);
     try {
       const res = await api.post("/api/player/control", body);
       if (body.action === "volume" || body.action === "unmute") {
@@ -232,12 +213,13 @@
   function connectMonitor() {
     clearTimeout(retryTimer);
     monitor.src = `${monitor.dataset.src}${monitor.dataset.src.includes("?") ? "&" : "?"}t=${Date.now()}`;
-    monitor.play().catch(() => {});
+    monitor.play().catch((ex) => console.info("monitor play", ex.name, ex.message));
   }
 
   function setListening(on) {
     listening = on;
     document.querySelectorAll("[data-listen]").forEach((b) => b.setAttribute("aria-pressed", String(on)));
+    if (on) routeMonitor(); // LISTEN 클릭 안에서 오디오 경로를 만들어야 브라우저가 소리를 막지 않는다
     if (on) connectMonitor();
     else {
       clearTimeout(retryTimer);
@@ -248,13 +230,14 @@
   }
 
   if (monitor) {
-    // 정지·일시정지하면 MPD가 스트림을 끊으므로, 다시 재생되면 자동으로 붙는다
-    const retry = () => {
-      if (listening) retryTimer = setTimeout(() => status && status.state === "play" ? connectMonitor() : retry(), 2000);
+    // 스트림이 실제로 끊기면 다시 붙는다. stalled 는 정상 라이브 스트림에서도 떠서 쓰지 않는다
+    // (그걸로 다시 붙으면 소리가 나기 전에 계속 끊겼다).
+    const retry = (e) => {
+      console.info("monitor", e.type, monitor.error && monitor.error.message);
+      if (listening) retryTimer = setTimeout(() => status && status.state === "play" ? connectMonitor() : retry(e), 2000);
     };
     monitor.addEventListener("error", retry);
     monitor.addEventListener("ended", retry);
-    monitor.addEventListener("stalled", retry);
     document.querySelectorAll("[data-listen]").forEach((b) => b.addEventListener("click", () => setListening(!listening)));
   }
 
@@ -349,6 +332,8 @@
 
   [knob, ...faders].forEach((el) => {
     el.addEventListener("wheel", (e) => {
+      // 클릭해서 잡은(포커스된) 컨트롤만 휠로 움직인다. 아니면 화면을 스크롤하다 지나가기만 해도 볼륨이 줄었다
+      if (document.activeElement !== el) return;
       e.preventDefault();
       nudge(e.deltaY < 0 ? 1 : -1);
     }, { passive: false });
@@ -362,13 +347,191 @@
     });
   });
 
+  // ── 효과음: Web Audio로 그 자리에서 만든다(파일 없음). 체크를 풀면 끈다 ──
+  const sfxBox = $("sfx");
+  try {
+    sfxBox.checked = localStorage.getItem("sfx") !== "off";
+  } catch {}
+  sfxBox.addEventListener("change", () => {
+    try {
+      localStorage.setItem("sfx", sfxBox.checked ? "on" : "off");
+    } catch {}
+  });
+  let audioCtx;
+
+  /** kind: "tick"(턴테이블 눈금) | "next" | "previous"(스크래치) */
+  function sfx(kind) {
+    if (!sfxBox.checked) return;
+    try {
+      audioCtx ||= new AudioContext();
+    } catch {
+      return;
+    }
+    const ac = audioCtx;
+    if (ac.state === "suspended") ac.resume();
+    const t = ac.currentTime;
+    const out = ac.createGain();
+    out.connect(ac.destination);
+    if (kind === "tick") {
+      const o = ac.createOscillator();
+      o.type = "square";
+      o.frequency.value = 2200;
+      out.gain.setValueAtTime(0.04, t);
+      out.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+      o.connect(out);
+      o.start(t);
+      o.stop(t + 0.03);
+      return;
+    }
+    // 스크래치: 짧은 잡음을 대역 필터로 쓸어내린다(다음 곡) / 쓸어올린다(이전 곡)
+    const len = 0.28;
+    const buf = ac.createBuffer(1, Math.round(ac.sampleRate * len), ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const bp = ac.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.Q.value = 6;
+    const [f0, f1] = kind === "next" ? [3000, 300] : [300, 3000];
+    bp.frequency.setValueAtTime(f0, t);
+    bp.frequency.exponentialRampToValueAtTime(f1, t + len);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.3, t + 0.03);
+    out.gain.exponentialRampToValueAtTime(0.001, t + len);
+    src.connect(bp).connect(out);
+    src.start(t);
+    src.stop(t + len);
+  }
+
+  // ── 이퀄라이저(왼쪽 위 GAIN·TREBLE·BASS 노브): LISTEN으로 듣는 이 기기 소리만 바꾼다 ──
+  // ponytail: 강의실 스피커 소리는 그대로다. 바꾸려면 서버 ALSA 이퀄라이저(B) 또는 앰프 노브(C), docs/laptop-test-guide.md 참고
+  const EQ = { gain: 0.5, treble: 0.5, bass: 0.5 }; // 노브 위치 0~1, 0.5 = 원래 소리
+  const toDb = (v) => Math.round((v - 0.5) * 24); // -12 ~ +12 dB
+  let eqNodes;
+
+  function applyEq() {
+    if (!eqNodes) return;
+    eqNodes.bass.gain.value = toDb(EQ.bass);
+    eqNodes.treble.gain.value = toDb(EQ.treble);
+    eqNodes.gain.gain.value = 10 ** (toDb(EQ.gain) / 20);
+  }
+
+  /** 모니터 오디오 → 저음 → 고음 → 음량 → 스피커. 요소 하나에 한 번만 만들 수 있다. */
+  function routeMonitor() {
+    if (!monitor) return;
+    try {
+      audioCtx ||= new AudioContext();
+    } catch {
+      return;
+    }
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (eqNodes) return;
+    const bass = new BiquadFilterNode(audioCtx, { type: "lowshelf", frequency: 200 });
+    const treble = new BiquadFilterNode(audioCtx, { type: "highshelf", frequency: 3000 });
+    const gain = new GainNode(audioCtx);
+    audioCtx.createMediaElementSource(monitor).connect(bass).connect(treble).connect(gain).connect(audioCtx.destination);
+    eqNodes = { bass, treble, gain };
+    applyEq();
+  }
+
+  document.querySelectorAll(".knob[data-eq]").forEach((k) => {
+    const key = k.dataset.eq;
+    const set = (v) => {
+      EQ[key] = Math.min(1, Math.max(0, v));
+      const db = toDb(EQ[key]);
+      k.style.setProperty("--v", EQ[key]);
+      k.setAttribute("aria-valuenow", String(db));
+      k.setAttribute("aria-valuetext", `${db > 0 ? "+" : ""}${db} dB`);
+      k.title = `${key.toUpperCase()} ${db > 0 ? "+" : ""}${db} dB`;
+      applyEq();
+    };
+    let y = null;
+    let start = 0;
+    k.addEventListener("pointerdown", (e) => {
+      k.setPointerCapture(e.pointerId);
+      k.focus();
+      y = e.clientY;
+      start = EQ[key];
+    });
+    k.addEventListener("pointermove", (e) => y != null && set(start + (y - e.clientY) / 150)); // 위로 끌면 올라간다
+    k.addEventListener("pointerup", () => (y = null));
+    k.addEventListener("pointercancel", () => (y = null));
+    k.addEventListener("dblclick", () => set(0.5));
+    k.addEventListener("wheel", (e) => {
+      if (document.activeElement !== k) return; // 볼륨 노브와 같은 이유: 스크롤로 바뀌지 않게
+      e.preventDefault();
+      set(EQ[key] + (e.deltaY < 0 ? 1 : -1) / 24);
+    }, { passive: false });
+    k.addEventListener("keydown", (e) => {
+      const step = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
+      if (step) set(EQ[key] + step / 24);
+      else if (e.key === "Home" || e.key === "Escape") set(0.5);
+      else return;
+      e.preventDefault();
+    });
+    set(EQ[key]);
+  });
+
+  // ── 곡 넘김 연출: 앨범 아트가 덱 사이를 날아가고 왼쪽 판이 한 바퀴 돈다.
+  //    서버 응답(과 몇 초 늦는 LISTEN 소리)을 기다리지 않고 화면을 먼저 바꾼다. 응답이 오면 실제 상태로 다시 그린다.
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function fly(from, to) {
+    const a = from.getBoundingClientRect();
+    const b = to.getBoundingClientRect();
+    if (!a.width || !b.width) return;
+    const ghost = from.cloneNode(true);
+    ghost.removeAttribute("id");
+    ghost.classList.add("art-fly");
+    Object.assign(ghost.style, {
+      left: `${a.left}px`, top: `${a.top}px`, width: `${a.width}px`, height: `${a.height}px`,
+      fontSize: getComputedStyle(from).fontSize,
+    });
+    document.body.append(ghost);
+    const dx = b.left + b.width / 2 - (a.left + a.width / 2);
+    const dy = b.top + b.height / 2 - (a.top + a.height / 2);
+    const done = () => ghost.remove();
+    ghost.animate(
+      [{ transform: "none" }, { transform: `translate(${dx}px, ${dy}px) scale(${b.width / a.width})` }],
+      { duration: 450, easing: "cubic-bezier(.3,.7,.2,1)" }
+    ).finished.then(done, done);
+    to.animate([{ opacity: 0 }, { opacity: 0, offset: 0.85 }, { opacity: 1 }], { duration: 450 });
+  }
+
+  function skipFx(action) {
+    if (!status || !status.current) return;
+    const target = action === "next" ? status.next : queue[status.current.position - 1];
+    if (!target) return; // 넘어갈 곡이 없다
+    const after = queue[target.position + 1] || null;
+    sfx(action);
+    if (!reduceMotion) {
+      if (action === "next") fly($("right-art"), $("left-art"));
+      else fly($("left-art"), $("right-art"));
+      $("jog-left").querySelector(".jog-platter").animate(
+        [{ rotate: "0deg" }, { rotate: `${action === "next" ? 360 : -360}deg` }],
+        { duration: 600, easing: "cubic-bezier(.2,.8,.3,1)", composite: "add" }
+      );
+    }
+    $("left-artist").textContent = target.artist || "—";
+    $("left-title").textContent = target.title;
+    paintArt($("left-art"), target);
+    $("left-time").textContent = target.duration ? `-${fmt(target.duration)}` : "-0:00";
+    $("right-title").textContent = after ? after.title : "없음";
+    paintArt($("right-art"), after);
+  }
+
   // ── 턴테이블: 잡고 JOG_DEG 만큼 돌리면 왼쪽 = 이전 곡, 오른쪽 = 다음 곡(한 번 잡을 때 한 곡) ──
-  const JOG_DEG = 45; // 손맛에 맞게 조정
+  // 돌리는 동안 바깥 링이 차오르고, TICK_DEG 마다 딸깍 소리가 난다.
+  const JOG_DEG = 90; // 손맛에 맞게 조정
+  const TICK_DEG = 15;
   document.querySelectorAll(".jog").forEach((jog) => {
     const action = jog.id === "jog-right" ? "next" : "previous";
+    const meter = jog.querySelector(".jog-meter");
     let rot = 0;
     let last = null;
     let turned = 0;
+    let ticks = 0;
     const angle = (e) => {
       const r = jog.getBoundingClientRect();
       return (Math.atan2(e.clientY - r.top - r.height / 2, e.clientX - r.left - r.width / 2) * 180) / Math.PI;
@@ -378,6 +541,9 @@
       jog.setPointerCapture(e.pointerId);
       last = angle(e);
       turned = 0;
+      ticks = 0;
+      meter.style.setProperty("--p", 0);
+      jog.classList.add("turning");
     });
     jog.addEventListener("pointermove", (e) => {
       if (last == null) return;
@@ -388,14 +554,25 @@
       jog.style.setProperty("--rot", `${rot}deg`);
       if (turned === null) return; // 이번 잡기에서 이미 넘김
       turned += d;
-      if (Math.abs(turned) >= JOG_DEG) {
+      const p = Math.min(Math.abs(turned) / JOG_DEG, 1);
+      meter.style.setProperty("--p", p);
+      meter.style.setProperty("--from", turned < 0 ? `${-p * 360}deg` : "0deg"); // 돌린 방향으로 차오른다
+      const t = Math.floor(Math.abs(turned) / TICK_DEG);
+      if (t > ticks && p < 1) sfx("tick");
+      ticks = t;
+      if (p >= 1) {
         turned = null;
         jog.classList.add("fired");
         setTimeout(() => jog.classList.remove("fired"), 300);
+        if (!reduceMotion) jog.animate([{ scale: 1 }, { scale: 1.03 }, { scale: 1 }], { duration: 220 });
+        navigator.vibrate?.(20);
         control({ action });
       }
     });
-    const release = () => (last = null);
+    const release = () => {
+      last = null;
+      jog.classList.remove("turning");
+    };
     jog.addEventListener("pointerup", release);
     jog.addEventListener("pointercancel", release);
   });
