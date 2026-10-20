@@ -265,11 +265,32 @@ class PlayerController:
     def stop(self) -> None:
         self._call(lambda c: c.stop())
 
-    def next(self) -> None:
-        self._call(lambda c: c.next())
+    def next(self, max_volume: int) -> None:
+        self._skip(1, max_volume)
 
-    def previous(self) -> None:
-        self._call(lambda c: c.previous())
+    def previous(self, max_volume: int) -> None:
+        self._skip(-1, max_volume)
+
+    def _skip(self, step: int, max_volume: int) -> None:
+        def _do(c: MPDClient) -> None:
+            st = c.status()
+            if st.get("state") != "stop":
+                # 마지막 곡에서 next 하면 MPD는 재생을 멈춘다. 턴테이블을 잘못 돌려 음악이 끊기지 않게 막는다
+                if step > 0 and st.get("nextsong") is None:
+                    raise PlayerError(409, "NO_NEXT_SONG", "대기열의 마지막 곡이에요.")
+                c.next() if step > 0 else c.previous()
+                return
+            # 멈춘 상태에서는 MPD가 next/previous 를 거부한다("Not playing"). 멈춘 곡 기준 앞/뒤 곡을 재생한다
+            length = _int(st.get("playlistlength")) or 0
+            cur = _int(st.get("song"))
+            target = 0 if cur is None else cur + step
+            if not 0 <= target < length:
+                raise PlayerError(409, "NO_NEXT_SONG" if step > 0 else "NO_PREVIOUS_SONG",
+                                  "대기열의 마지막 곡이에요." if step > 0 else "대기열의 첫 곡이에요.")
+            self._enforce_cap(c, st, max_volume)
+            c.play(target)
+
+        self._call(_do)
 
     def set_volume(self, requested: int, max_volume: int) -> VolumeResult:
         """요청값을 상한으로 자른 뒤 적용한다(NFR-006). 음소거 중이면 음소거를 해제한다."""

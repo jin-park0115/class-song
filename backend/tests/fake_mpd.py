@@ -57,8 +57,10 @@ class _Client:
             "playlistlength": str(len(f.songs)),
             "playlist": str(f.version),
         }
+        if f.songs:
+            st["song"] = str(f.pos)  # 실제 MPD도 멈춘 뒤에 마지막 곡 위치를 알려준다
         if f.state != "stop" and f.songs:
-            st |= {"song": str(f.pos), "elapsed": "5.0", "duration": f.songs[f.pos]["duration"]}
+            st |= {"elapsed": "5.0", "duration": f.songs[f.pos]["duration"]}
             if f.pos + 1 < len(f.songs):
                 st["nextsong"] = str(f.pos + 1)
         return st
@@ -99,7 +101,7 @@ class _Client:
         self._check()
         f = self._f
         if f.state == "stop":
-            return
+            raise CommandError("[55@0] {next} Not playing")  # 실제 MPD와 같다
         if f.pos + 1 < len(f.songs):
             f.pos += 1
         else:
@@ -109,8 +111,9 @@ class _Client:
     def previous(self):
         self._check()
         f = self._f
-        if f.state != "stop":
-            f.pos = max(0, f.pos - 1)
+        if f.state == "stop":
+            raise CommandError("[55@0] {previous} Not playing")
+        f.pos = max(0, f.pos - 1)
 
     def update(self, uri=None):
         self._check()

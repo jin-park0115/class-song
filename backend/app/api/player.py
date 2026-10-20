@@ -101,9 +101,9 @@ def control(body: ControlIn, admin: AdminUser, player: Player, db: DB) -> dict:
             case "stop":
                 player.stop()
             case "next":
-                player.next()
+                player.next(max_volume)
             case "previous":
-                player.previous()
+                player.previous(max_volume)
             case "mute":
                 player.mute()
             case "volume":

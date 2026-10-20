@@ -115,9 +115,9 @@ def test_real_mpd_full_cycle(player):
     player.unmute(max_volume=40)
     assert player.status()["volume"] == 40
 
-    player.next()
+    player.next(max_volume=40)
     assert player.status()["current"]["title"] == "Tone 660"
-    player.previous()
+    player.previous(max_volume=40)
     assert player.status()["current"]["title"] == "Tone 440"
     player.play_at(1, max_volume=40)
     assert player.status()["current"]["title"] == "Tone 660"

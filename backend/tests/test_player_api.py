@@ -189,6 +189,22 @@ def test_play_at_and_previous(admin_client, fake_mpd):
     assert res.json()["status"]["current"]["title"] == "Song A"
 
 
+def test_skip_while_stopped_and_at_edges(admin_client, fake_mpd):
+    """멈춘 상태에서도 next/previous 가 된다(MPD는 "Not playing"으로 거부). 마지막 곡에서 next 는 멈추지 않는다."""
+    def act(action):
+        return admin_client.post("/api/player/control", json={"action": action})
+
+    st = act("next").json()["status"]  # 처음부터 멈춤(0번) → 1번 재생
+    assert st["state"] == "play" and st["current"]["title"] == "Song B"
+    res = act("next")  # 마지막 곡
+    assert res.status_code == 409 and res.json()["error"]["code"] == "NO_NEXT_SONG"
+    assert fake_mpd.state == "play"
+    act("stop")
+    assert act("previous").json()["status"]["current"]["title"] == "Song A"
+    act("stop")
+    assert act("previous").json()["error"]["code"] == "NO_PREVIOUS_SONG"
+
+
 def test_play_at_enforces_volume_cap(admin_client, fake_mpd):
     fake_mpd.volume = 90
     admin_client.post("/api/player/control", json={"action": "play_at", "position": 0})
