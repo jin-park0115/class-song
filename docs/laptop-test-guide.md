@@ -22,7 +22,7 @@ docker compose ps                   # app·db·mpd 가 Up, app 은 (healthy)
 docker compose exec app python -m app.cli create --login-id admin --name 운영자
 ```
 
-브라우저에서 **http://localhost:8000** 을 연다.
+브라우저에서 **http://localhost:8080** 을 연다.
 
 ## 3. 해볼 순서
 
@@ -41,8 +41,8 @@ docker compose exec app python -m app.cli create --login-id admin --name 운영�
 
 ### 휴대폰으로도 보기
 
-노트북과 휴대폰이 같은 Wi-Fi라면 휴대폰 브라우저에서 `http://<노트북 IP>:8000` 으로 접속한다.
-노트북 IP는 PowerShell `ipconfig` 의 "IPv4 주소"다. 안 열리면 Windows 방화벽에서 Docker Desktop의 8000 포트를 허용한다.
+노트북과 휴대폰이 같은 Wi-Fi라면 휴대폰 브라우저에서 `http://<노트북 IP>:8080` 으로 접속한다.
+노트북 IP는 PowerShell `ipconfig` 의 "IPv4 주소"다. 안 열리면 Windows 방화벽에서 Docker Desktop의 8080 포트를 허용한다.
 
 ## 4. 끄기·초기화
 
@@ -60,7 +60,7 @@ docker compose logs -f app   # 앱 로그 보기
 |---|---|---|
 | 소리 | MPD `httpd` 출력 → 콘솔 **LISTEN** 으로 브라우저 재생 | MPD `alsa` 출력 → 앰프 (`deploy/mpd/mpd.conf`) |
 | 실행 | `docker compose up` | systemd 또는 같은 compose 파일에서 mpd만 ALSA로 교체 |
-| 접속 | http://localhost:8000 | http://<서버 IP>:8000 (같은 Wi-Fi) |
+| 접속 | http://localhost:8080 | http://<서버 IP>:8000 (같은 Wi-Fi) |
 
 노트북에서 흐름을 다 확인했으면 [ubuntu-audio-setup.md](ubuntu-audio-setup.md) 순서대로 강의실 서버에 옮긴다.
 
@@ -68,7 +68,8 @@ docker compose logs -f app   # 앱 로그 보기
 
 | 증상 | 확인 |
 |---|---|
-| `localhost:8000` 이 안 열림 | `docker compose ps` 에서 app 이 healthy 인지, `docker compose logs app` |
+| `port is already allocated` 오류 | 다른 프로그램이 그 포트를 쓰는 중. 저장소 폴더에 `.env` 파일을 만들고 `APP_PORT=8090` 처럼 다른 번호를 적은 뒤 `docker compose up -d` |
+| `localhost:8080` 이 안 열림 | `docker compose ps` 에서 app 이 healthy 인지, `docker compose logs app` |
 | 콘솔에 "MPD 연결 끊김" | `docker compose logs mpd` |
 | LISTEN 을 눌러도 소리가 안 남 | 곡이 **재생 중**인지 확인(정지 중에는 스트림이 없다). 브라우저 탭 음소거·노트북 볼륨 확인 |
 | 곡 미리보기에 제목이 안 나옴 | 노트북 인터넷 연결 확인. 안 되면 곡명을 직접 입력해 신청할 수 있다 |

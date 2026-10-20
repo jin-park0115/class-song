@@ -21,7 +21,7 @@
 ```bash
 docker compose up -d --build
 docker compose exec app python -m app.cli create --login-id admin --name 운영자
-# http://localhost:8000  → 관리자 로그인 / 다른 창에서 학생 회원가입
+# http://localhost:8080  → 관리자 로그인 / 다른 창에서 학생 회원가입
 ```
 
 자세한 순서는 [노트북 테스트 가이드](docs/laptop-test-guide.md).
