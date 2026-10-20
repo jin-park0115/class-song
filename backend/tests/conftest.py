@@ -6,6 +6,10 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+psycopg://jukebox:jukebox@localhost:5432/jukebox_test"
 )
 os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="jukebox-media-")
+os.environ["SCHEDULER_ENABLED"] = "false"  # 테스트는 시각을 고정하고 runner.tick 을 직접 부른다
+
+from datetime import UTC, datetime  # noqa: E402
+from zoneinfo import ZoneInfo  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -68,6 +72,25 @@ def fake_mpd():
     return FakeMPD()
 
 
+class FixedClock:
+    """스케줄 시각 고정용 시계. clock.set("2026-10-19 08:00")(서울 시각)로 옮긴다."""
+
+    def __init__(self):
+        self.now = datetime(2026, 10, 19, 0, 0, tzinfo=UTC)  # 월요일 09:00 KST
+
+    def set(self, local: str) -> datetime:
+        self.now = datetime.fromisoformat(local).replace(tzinfo=ZoneInfo("Asia/Seoul")).astimezone(UTC)
+        return self.now
+
+    def __call__(self) -> datetime:
+        return self.now
+
+
+@pytest.fixture
+def clock():
+    return FixedClock()
+
+
 class FakeYouTube:
     """oEmbed 대신 쓰는 메타데이터 조회. available=False 면 조회 실패를 흉내 낸다."""
 
@@ -88,9 +111,9 @@ def fake_youtube():
 
 
 @pytest.fixture
-def client(fake_mpd, fake_youtube):
-    player = PlayerController("fake", 0, client_factory=fake_mpd.factory)
-    with TestClient(create_app(player, metadata_fetcher=fake_youtube)) as c:
+def client(fake_mpd, fake_youtube, clock):
+    player = PlayerController("fake", 0, client_factory=fake_mpd.factory, sleep=lambda _: None)
+    with TestClient(create_app(player, metadata_fetcher=fake_youtube, clock=clock)) as c:
         yield c
 
 

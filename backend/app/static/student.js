@@ -52,6 +52,24 @@
     }
   }
 
+  // ── 재생 시간표(오늘·이번 주) ───────────────────────────
+  const STATUS = { now: "재생 시간", done: "끝남", upcoming: "예정" };
+  const slot = (w, withDay) => el("li", { class: `slot s-${w.status}` },
+    el("span", { class: "slot-time" }, withDay ? `${WEEKDAYS[w.weekday - 1]} ` : "", `${w.start_time}–${w.end_time}`),
+    el("span", { class: "tl-body" }, el("b", {}, w.name), el("span", { class: "small muted" }, ` · ${w.playlist_name}`)),
+    el("span", { class: `badge s-${w.status}` }, STATUS[w.status]));
+
+  async function loadSchedule() {
+    try {
+      const res = await api.get("/api/schedules/upcoming");
+      $("next-play").textContent = res.next ? `다음 재생 ${whenLabel(res.next.start)}` : "";
+      $("today").replaceChildren(...(res.today.length ? res.today.map((w) => slot(w, false)) : [el("li", { class: "muted" }, "오늘은 예약된 재생이 없어요.")]));
+      $("week").replaceChildren(...(res.week.length ? res.week.map((w) => slot(w, true)) : [el("li", { class: "muted" }, "이번 주는 예약된 재생이 없어요.")]));
+    } catch (ex) {
+      if (!guard(ex)) $("today").replaceChildren(el("li", { class: "muted" }, ex.message));
+    }
+  }
+
   // ── 곡 신청 ────────────────────────────────────────
   async function preview() {
     showError("req-err", "");
@@ -205,9 +223,11 @@
       if (home !== "/me" && home !== "/admin") return (location.href = home);
       $("who").textContent = `${me.name} (${me.login_id})`;
       refreshNow();
+      loadSchedule();
       loadMine();
       loadApproved();
       setInterval(refreshNow, 5000);
+      setInterval(loadSchedule, 60000);
     } catch (ex) {
       guard(ex);
     }

@@ -81,6 +81,7 @@ input:not([type="range"]) {
   font: inherit;
 }
 input[type="range"] { flex: 1; accent-color: var(--primary); }
+input[type="checkbox"] { width: auto; padding: 0; accent-color: var(--primary); }
 output { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
 
 .btn {
@@ -240,3 +241,97 @@ select {
   .tl-side { flex-direction: row; width: 100%; justify-content: flex-end; }
   .search { max-width: 140px; }
 }
+
+/* ── 관리: 플레이리스트 편집기 ───────────────────────── */
+.nowrap { white-space: nowrap; }
+.pl-layout { display: grid; grid-template-columns: minmax(10rem, 15rem) 1fr; gap: 16px; align-items: start; }
+.pl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pl-pick {
+  display: grid; gap: 2px; width: 100%; padding: 8px 10px; text-align: left;
+  background: transparent; color: inherit; font: inherit; border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+}
+.pl-pick.on { border-color: var(--primary); box-shadow: inset 3px 0 0 var(--primary); }
+.pl-pick:focus-visible { outline: 3px solid var(--primary); }
+.pl-head { flex-wrap: wrap; gap: 8px; }
+.pl-head label { margin: 0; font-weight: 400; }
+.pl-head input:not([type="checkbox"]) { flex: 1 1 10rem; }
+.pl-items { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
+.pl-items > li {
+  display: grid; grid-template-columns: auto 1.6em 36px 1fr auto auto; gap: 8px; align-items: center;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+}
+.pl-items > li.muted { display: block; border-style: dashed; }
+.pl-items > li.bad { border-color: var(--danger); }
+.pl-items > li.dragging { opacity: .4; }
+.pl-items > li.over { border-color: var(--primary); box-shadow: 0 -2px 0 var(--primary); }
+.pl-items .thumb { width: 36px; }
+.pl-items .grip { cursor: grab; color: var(--muted); user-select: none; }
+.pl-items .idx { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.pl-title { min-width: 0; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pl-ops { display: flex; gap: 2px; }
+.icon {
+  width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: inherit; cursor: pointer; font: inherit;
+}
+.icon:disabled { opacity: .35; cursor: default; }
+.icon:focus-visible { outline: 3px solid var(--primary); }
+.pl-add select { flex: 1; min-width: 0; }
+
+/* ── 관리: 스케줄 주간 시간표 ────────────────────────── */
+.timetable {
+  --hours: 10;
+  display: grid; grid-template-columns: 2.6em repeat(7, minmax(0, 1fr)); gap: 3px; margin: 12px 0;
+}
+.tt-day { height: 1.6em; text-align: center; font-weight: 700; font-size: .85rem; }
+.tt-body {
+  position: relative; height: max(320px, calc(var(--hours) * 34px));
+  border-radius: 6px; background: repeating-linear-gradient(var(--border) 0 1px, transparent 1px calc(100% / var(--hours)));
+  outline: 1px solid var(--border);
+}
+.tt-axis .tt-body { background: none; outline: 0; }
+.tt-axis span { position: absolute; right: 2px; transform: translateY(-50%); font-size: .7rem; color: var(--muted); }
+.tt-axis span:first-child { transform: none; }
+.tt-block {
+  position: absolute; left: 2px; right: 2px; overflow: hidden; padding: 2px 4px;
+  display: flex; flex-direction: column; text-align: left; gap: 0;
+  border: 0; border-radius: 5px; background: var(--primary); color: var(--primary-text);
+  font: 600 .72rem/1.25 inherit; cursor: pointer;
+  min-height: 1.5em; /* 몇 분짜리 짧은 구간도 보이고 누를 수 있게 */
+}
+.tt-block b, .tt-block span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-block span { font-weight: 400; opacity: .9; }
+.tt-block.short { justify-content: center; padding-block: 0; }
+.tt-block.short span { display: none; }
+.tt-block.off { left: 50%; z-index: 1; background: var(--surface); color: var(--muted); border: 1px dashed var(--muted); } /* 꺼 둔 스케줄은 오른쪽 반에 겹쳐 보이게 */
+.tt-block.conflict { background: var(--danger); color: var(--danger-text); outline: 2px solid var(--danger); outline-offset: 1px; }
+.tt-block:focus-visible { outline: 3px solid var(--text); outline-offset: 1px; }
+.sc-form { margin: 12px 0; }
+.sc-form h3 { margin-top: 0; }
+.sc-field { display: grid; gap: 4px; flex: 1 1 9rem; margin: 10px 0 0; }
+.sc-field > span { font-weight: 600; }
+.sc-field small { font-weight: 400; }
+.sc-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.sc-days { border: 0; padding: 0; margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.sc-days legend { font-weight: 600; margin-bottom: 4px; padding: 0; }
+.sc-days label, .sc-check { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-weight: 400; }
+.sc-check { margin: 12px 0; }
+
+@media (max-width: 560px) {
+  .pl-layout { grid-template-columns: 1fr; }
+  .pl-items > li { grid-template-columns: 36px 1fr auto; }
+  .pl-items .grip, .pl-items .idx { display: none; }
+  .pl-items > li > .small { display: none; }
+  .tt-block span { display: none; }
+}
+
+/* ── 학생: 재생 시간표 ───────────────────────────────── */
+.sched-label { margin: 0; }
+.sched-list > li.slot { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 0; }
+.slot .tl-body { overflow-wrap: anywhere; }
+.slot-time { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.slot.s-done { opacity: .55; }
+.badge.s-now { color: var(--ok); border-color: var(--ok); }
+.badge.s-upcoming { color: var(--primary); border-color: var(--primary); }
+.badge.s-done { color: var(--muted); }
+.week { margin-top: 8px; }
+.week summary { cursor: pointer; }

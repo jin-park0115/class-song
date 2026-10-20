@@ -13,6 +13,7 @@ from app.errors import ApiError
 from app.models import Track
 from app.services import audit
 from app.services.player import PlayerController, PlayerError
+from app.services.scheduler import ScheduleRunner
 from app.services.settings import get_max_volume
 
 router = APIRouter(prefix="/api/player", tags=["player"])
@@ -24,9 +25,16 @@ def get_player(request: Request) -> PlayerController:
 
 Player = Annotated[PlayerController, Depends(get_player)]
 
-# resume_schedule 은 스케줄러가 생기는 STEP 03에서 추가한다.
+
+def get_runner(request: Request) -> ScheduleRunner:
+    return request.app.state.runner
+
+
+Runner = Annotated[ScheduleRunner, Depends(get_runner)]
+
 Action = Literal[
-    "play", "play_at", "pause", "resume", "stop", "next", "previous", "volume", "mute", "unmute"
+    "play", "play_at", "pause", "resume", "stop", "next", "previous", "volume", "mute", "unmute",
+    "resume_schedule",
 ]
 
 
@@ -61,15 +69,16 @@ def _enrich(db: DB, songs: list[dict | None]) -> None:
             }
 
 
-def _status(player: PlayerController, db: DB) -> dict:
+def _status(player: PlayerController, runner: ScheduleRunner, db: DB) -> dict:
     st = player.status()
     _enrich(db, [st["current"], st["next"]])
-    return {**st, "max_volume": get_max_volume(db)}
+    # schedule.cause: 재생 원인(SCHEDULE 예약 / MANUAL 수동), current·next: 지금·다음 예약 구간
+    return {**st, "max_volume": get_max_volume(db), "schedule": runner.info(db, st["state"])}
 
 
 @router.get("/status")
-def status(_: ActiveUser, player: Player, db: DB) -> dict:
-    return _status(player, db)
+def status(_: ActiveUser, player: Player, runner: Runner, db: DB) -> dict:
+    return _status(player, runner, db)
 
 
 @router.get("/queue")
@@ -83,7 +92,7 @@ def queue(_: ActiveUser, player: Player, db: DB) -> dict:
 
 
 @router.post("/control")
-def control(body: ControlIn, admin: AdminUser, player: Player, db: DB) -> dict:
+def control(body: ControlIn, admin: AdminUser, player: Player, runner: Runner, db: DB) -> dict:
     max_volume = get_max_volume(db)
     result: dict = {"ok": True}
     payload: dict = {"action": body.action}
@@ -100,6 +109,9 @@ def control(body: ControlIn, admin: AdminUser, player: Player, db: DB) -> dict:
                 player.resume(max_volume)
             case "stop":
                 player.stop()
+                runner.manual_stop()  # 예약 구간 중이면 그 구간은 정지 유지(10장)
+            case "resume_schedule":
+                runner.resume_schedule()
             case "next":
                 player.next(max_volume)
             case "previous":
@@ -122,20 +134,22 @@ def control(body: ControlIn, admin: AdminUser, player: Player, db: DB) -> dict:
 
     audit.record(db, admin.id, f"player.{body.action}", payload)
     db.commit()
-    return result | {"status": _status(player, db)}
+    return result | {"status": _status(player, runner, db)}
 
 
 @router.post("/emergency-stop")
-def emergency_stop(admin: AdminUser, player: Player, db: DB) -> dict:
+def emergency_stop(admin: AdminUser, player: Player, runner: Runner, db: DB) -> dict:
+    """페이드 없이 즉시 정지 + 현재 예약 구간은 자동으로 다시 틀지 않는다."""
     try:
         player.emergency_stop()
+        runner.manual_stop(emergency=True)
     except PlayerError as exc:
         audit.record(db, admin.id, "player.emergency_stop", {"error": exc.code})
         db.commit()
         raise ApiError(exc.status, exc.code, exc.message) from exc
     audit.record(db, admin.id, "player.emergency_stop", {})
     db.commit()
-    return {"ok": True, "status": _status(player, db)}
+    return {"ok": True, "status": _status(player, runner, db)}
 
 
 @router.get("/monitor")

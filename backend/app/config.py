@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # /api/player/monitor 로 이 스트림을 받아 이 기기 스피커로 들려준다(노트북 테스트용). 비우면 숨긴다.
     mpd_monitor_url: str | None = None
 
+    # 자동 스케줄 실행(APScheduler). 테스트에서는 끄고 시각을 고정해 직접 실행한다.
+    scheduler_enabled: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

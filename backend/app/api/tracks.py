@@ -155,7 +155,7 @@ class QueueIn(BaseModel):
 
 @router.post("/api/admin/queue")
 def add_to_queue(body: QueueIn, admin: AdminUser, player: Player, db: DB) -> dict:
-    """재생 가능한(READY) 곡을 MPD 대기열 끝에 추가한다. 플레이리스트 편성은 STEP 03에서."""
+    """재생 가능한(READY) 곡을 MPD 대기열 끝에 추가한다(수동 재생용. 예약 재생은 플레이리스트·스케줄)."""
     track = _track(db, body.track_id)
     if track.media_status != "READY" or not track.media_path:
         raise ApiError(409, "TRACK_NOT_READY", "재생 가능한(READY) 곡만 대기열에 넣을 수 있습니다.")

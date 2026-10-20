@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
+    "apscheduler>=3.11,<4",
     "argon2-cffi>=25.1.0",
     "fastapi>=0.150.0",
     "httpx>=0.28.1",
@@ -14,6 +15,7 @@ dependencies = [
     "python-mpd2>=3.1.1",
     "python-multipart>=0.0.32",
     "sqlalchemy>=2",
+    "tzdata>=2026.5",
     "uvicorn[standard]>=0.54.0",
 ]
 

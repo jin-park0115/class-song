@@ -3,10 +3,11 @@ const api = (() => {
   let csrfToken = null;
 
   class ApiError extends Error {
-    constructor(status, code, message) {
+    constructor(status, code, message, detail = {}) {
       super(message);
       this.status = status;
       this.code = code;
+      this.detail = detail; // 예: 스케줄 겹침의 conflicts
     }
   }
 
@@ -29,7 +30,7 @@ const api = (() => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const e = data.error || {};
-      throw new ApiError(res.status, e.code || "UNKNOWN", e.message || `요청 실패 (${res.status})`);
+      throw new ApiError(res.status, e.code || "UNKNOWN", e.message || `요청 실패 (${res.status})`, e);
     }
     if (data.csrf_token) csrfToken = data.csrf_token;
     return data;
@@ -47,6 +48,7 @@ const api = (() => {
     get: (url) => request("GET", url),
     post: (url, body = {}) => request("POST", url, body),
     patch: (url, body = {}) => request("PATCH", url, body),
+    put: (url, body = {}) => request("PUT", url, body),
     del: (url) => request("DELETE", url),
     upload: (url, formData) => request("POST", url, formData),
     homeFor,
@@ -76,7 +78,24 @@ const LABELS = {
   UNKNOWN: "권리 미확인", CONFIRMED: "권리 확인", DENIED: "사용 불가",
   DUPLICATE: "중복", INAPPROPRIATE: "부적절", NO_RIGHTS: "이용 권리 없음", TOO_LONG: "너무 김", OTHER: "기타",
   PENDING_APPROVAL: "승인 대기", ACTIVE: "사용 중", DISABLED: "비활성",
+  RESTART: "처음부터 다시", SKIP: "이번 구간 건너뛰기", SEQUENTIAL: "차례대로", SHUFFLE: "섞어서",
+  REPEAT: "처음부터 반복", STOP: "멈춤",
 };
 const label = (code) => LABELS[code] || code;
 const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "");
 const fmtDur = (sec) => (sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : "");
+const fmtTotal = (sec) => (sec >= 3600 ? `${Math.floor(sec / 3600)}시간 ${Math.floor((sec % 3600) / 60)}분` : `${Math.round(sec / 60)}분`);
+// 스케줄 시각은 항상 서울 기준(요구사항 6장)
+const WEEKDAYS = "월화수목금토일";
+const hm = (iso) => new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" });
+const seoulDate = (d = new Date()) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }); // YYYY-MM-DD
+/** "오늘 08:00" · "내일 08:00" · "화 08:00"(6일 안) · "10/27(화) 08:00"(그보다 뒤) */
+function whenLabel(iso) {
+  const day = seoulDate(new Date(iso));
+  const today = seoulDate();
+  const days = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 864e5);
+  const wd = WEEKDAYS[(new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7];
+  const [, m, d] = day.split("-").map(Number);
+  const label = days === 0 ? "오늘" : days === 1 ? "내일" : days < 7 ? wd : `${m}/${d}(${wd})`;
+  return `${label} ${hm(iso)}`;
+}

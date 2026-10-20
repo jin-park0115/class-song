@@ -6,11 +6,12 @@ from fastapi.responses import JSONResponse
 class ApiError(Exception):
     """요구사항 7장 공통 에러 형식 {"error": {"code", "message"}} 으로 응답한다."""
 
-    def __init__(self, status: int, code: str, message: str):
+    def __init__(self, status: int, code: str, message: str, **extra):
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
+        self.extra = extra  # 예: 스케줄 겹침 409 의 conflicts
 
 
 def _body(code: str, message: str, **extra) -> dict:
@@ -20,7 +21,7 @@ def _body(code: str, message: str, **extra) -> dict:
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status, content=_body(exc.code, exc.message))
+        return JSONResponse(status_code=exc.status, content=_body(exc.code, exc.message, **exc.extra))
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

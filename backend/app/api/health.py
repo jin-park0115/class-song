@@ -25,5 +25,8 @@ def ready(request: Request) -> JSONResponse:
     player_status = request.app.state.player.status()
     checks["mpd"] = "ok" if player_status["connected"] else "unavailable"
 
-    ok = all(v == "ok" for v in checks.values())
+    scheduler = request.app.state.scheduler
+    checks["scheduler"] = "disabled" if scheduler is None else "ok" if scheduler.running else "stopped"
+
+    ok = all(v in ("ok", "disabled") for v in checks.values())
     return JSONResponse(status_code=200 if ok else 503, content={"status": "ok" if ok else "degraded", "checks": checks})

@@ -73,6 +73,11 @@
             <h2>재생 대기열</h2>
             <span class="screen-pill" id="queue-count">0곡</span>
           </header>
+          <div class="sched-bar" aria-live="polite">
+            <span class="cause-pill" id="cause-pill" data-cause="">대기</span>
+            <span class="sched-text" id="sched-text">—</span>
+            <button class="sched-resume" id="resume-schedule" hidden>▶ 예약 재개</button>
+          </div>
           <ol class="queue" id="queue" aria-label="재생 대기열" tabindex="0"></ol>
           <footer class="screen-foot" aria-live="polite">
             <span><i class="led" id="led-mpd"></i>MPD <b id="mpd-conn">—</b></span>

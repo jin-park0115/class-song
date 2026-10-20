@@ -84,6 +84,8 @@
       b.textContent = st.muted ? "MUTED" : "MUTE";
     });
 
+    renderSchedule(st.schedule, state);
+
     // 화면 하단 상태줄(색 + 글자)
     $("led-mpd").className = `led ${st.connected ? "ok" : "bad"}`;
     $("mpd-conn").textContent = st.connected ? "정상" : "연결 안 됨";
@@ -142,6 +144,27 @@
       return li;
     });
     list.replaceChildren(...rows);
+  }
+
+  /** 재생 원인(예약/수동)·지금 구간·다음 예약·"예약 재개" 버튼 */
+  function renderSchedule(sc, state) {
+    if (!sc) return;
+    const pill = $("cause-pill");
+    const cause = sc.cause || (state === "unknown" ? "" : "IDLE");
+    pill.dataset.cause = cause;
+    pill.textContent = { SCHEDULE: "예약", MANUAL: "수동", IDLE: "대기" }[cause] || "—";
+    const parts = [];
+    if (sc.current) {
+      parts.push(`${sc.current.name} · ${hm(sc.current.end)}까지`);
+      if (sc.can_resume) parts.push(sc.cause === "MANUAL" ? "예약 구간 중 수동 재생" : "예약 구간이지만 멈춰 있어요");
+    } else if (sc.cause === "MANUAL") {
+      parts.push("예약 시간 밖 수동 재생 · 일정 시간 뒤 자동으로 멈춰요");
+    }
+    if (sc.next && !sc.current) parts.push(`다음 예약 ${whenLabel(sc.next.start)} ${sc.next.name}`);
+    if (!sc.current && !sc.next) parts.push("예약된 재생이 없어요");
+    if (sc.warning) parts.push(`⚠ ${sc.warning}`);
+    $("sched-text").textContent = parts.join(" · ");
+    $("resume-schedule").hidden = !sc.can_resume;
   }
 
   /** 1초마다: 진행 링·남은 시간 갱신 */
@@ -595,6 +618,8 @@
       await refresh();
     })
   );
+
+  $("resume-schedule").addEventListener("click", () => control({ action: "resume_schedule" }));
 
   $("emergency").addEventListener("click", async () => {
     try {

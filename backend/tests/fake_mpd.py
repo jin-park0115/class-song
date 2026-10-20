@@ -19,6 +19,8 @@ class FakeMPD:
         self.version = 1
         self.updates: list = []
         self.missing: set[str] = set()  # add 시 "파일 없음"을 낼 경로
+        self.volume_log: list[int] = []  # setvol 이력(페이드 단계 검사)
+        self.repeat = 0
         self.timeout = None
 
     def factory(self):
@@ -137,3 +139,19 @@ class _Client:
         if not 0 <= v <= 100:
             raise CommandError("[2@0] {setvol} Invalid volume value")
         self._f.volume = v
+        self._f.volume_log.append(v)
+
+    def clear(self):
+        self._check()
+        f = self._f
+        f.songs = []
+        f.state = "stop"
+        f.pos = 0
+        f.version += 1
+
+    def repeat(self, flag):
+        self._check()
+        self._f.repeat = int(flag)
+
+    def random(self, flag):
+        self._check()

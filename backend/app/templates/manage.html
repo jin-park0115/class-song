@@ -15,6 +15,8 @@
   <button role="tab" id="tab-signups" aria-controls="panel-signups" data-tab="signups">가입 승인 <span class="count" id="c-signups"></span></button>
   <button role="tab" id="tab-requests" aria-controls="panel-requests" data-tab="requests">신청 승인 <span class="count" id="c-requests"></span></button>
   <button role="tab" id="tab-library" aria-controls="panel-library" data-tab="library">음원 라이브러리 <span class="count" id="c-library"></span></button>
+  <button role="tab" id="tab-playlists" aria-controls="panel-playlists" data-tab="playlists">플레이리스트 <span class="count" id="c-playlists"></span></button>
+  <button role="tab" id="tab-schedules" aria-controls="panel-schedules" data-tab="schedules">스케줄</button>
 </nav>
 
 <section class="card" role="tabpanel" id="panel-signups" aria-labelledby="tab-signups">
@@ -55,6 +57,35 @@
     곡마다 이용 조건(라이선스)이 다르니 확인한 근거를 ①에 적어 두세요.
   </p>
   <ul class="library" id="library"></ul>
+</section>
+
+<section class="card" role="tabpanel" id="panel-playlists" aria-labelledby="tab-playlists" hidden>
+  <div class="row between">
+    <h2>플레이리스트</h2>
+    <form id="pl-new" class="row">
+      <input id="pl-new-name" maxlength="100" placeholder="새 플레이리스트 이름" aria-label="새 플레이리스트 이름" required>
+      <button class="btn small primary">만들기</button>
+    </form>
+  </div>
+  <p class="muted small">재생 가능(READY)한 곡만 넣을 수 있어요. 끌어서(또는 ↑↓) 순서를 바꾸면 바로 저장돼요.</p>
+  <div class="pl-layout">
+    <ul class="pl-list" id="pl-list" aria-label="플레이리스트 목록"></ul>
+    <div class="pl-editor" id="pl-editor"><p class="muted">왼쪽에서 플레이리스트를 고르거나 새로 만드세요.</p></div>
+  </div>
+</section>
+
+<section class="card" role="tabpanel" id="panel-schedules" aria-labelledby="tab-schedules" hidden>
+  <div class="row between">
+    <h2>스케줄</h2>
+    <button class="btn small primary" id="sc-new">＋ 새 스케줄</button>
+  </div>
+  <p class="muted small">
+    시간은 서울 기준이에요. 켜 둔 스케줄끼리는 시간이 겹칠 수 없고, 자정을 넘는 구간은 만들 수 없어요.
+    볼륨은 최대 <b id="sc-cap">—</b>%로 제한돼요. 종료 시각에는 수동으로 틀어 둔 곡도 항상 페이드 아웃 후 멈춰요.
+  </p>
+  <div class="timetable" id="sc-grid" aria-label="주간 시간표"></div>
+  <form class="sc-form card" id="sc-form" hidden novalidate></form>
+  <ul class="tracklist" id="sc-list"></ul>
 </section>
 {% endblock %}
 {% block scripts %}

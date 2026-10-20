@@ -359,6 +359,25 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .led.ok  { background: var(--led-green); box-shadow: 0 0 6px var(--led-green); }
 .led.bad { background: var(--led-red);   box-shadow: 0 0 6px var(--led-red); }
 
+/* 재생 원인·다음 예약 줄(화면 맨 위) */
+.sched-bar {
+  display: flex; align-items: center; gap: 2cqi; flex-wrap: wrap;
+  margin: 0 4cqi 2cqi; padding: 1.4cqi 2.4cqi; border-radius: 6px;
+  background: rgba(255,255,255,.04); font-size: clamp(10px, 3.4cqi, 13px); color: #c9cdd2;
+}
+.cause-pill {
+  padding: .15em .6em; border-radius: 999px; font-weight: 800; letter-spacing: .04em;
+  background: #2a2d31; color: #9aa0a8;
+}
+.cause-pill[data-cause="SCHEDULE"] { background: color-mix(in srgb, var(--led-blue) 25%, transparent); color: #9cc6ff; }
+.cause-pill[data-cause="MANUAL"] { background: color-mix(in srgb, var(--led-orange) 25%, transparent); color: #ffc58a; }
+.sched-text { flex: 1; min-width: 0; }
+.sched-resume {
+  padding: .4em .8em; border: 0; border-radius: 6px; cursor: pointer;
+  background: var(--led-blue); color: #04122a; font: 800 1em/1 inherit;
+}
+.sched-resume:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
 /* ── 믹서 ─────────────────────────────────────────────── */
 .mixer {
   display: grid;

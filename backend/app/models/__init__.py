@@ -1,6 +1,6 @@
-"""DB 테이블. 플레이리스트·스케줄 등은 STEP 03에서 추가한다."""
+"""DB 테이블(요구사항 6장)."""
 
-from datetime import datetime
+from datetime import datetime, time
 
 from sqlalchemy import (
     BigInteger,
@@ -10,11 +10,14 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     Text,
+    Time,
+    UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -26,6 +29,10 @@ RIGHTS_STATUSES = ("UNKNOWN", "CONFIRMED", "DENIED")
 RIGHTS_BASES = ("OWNED_FILE", "LICENSED", "CC_LICENSE", "PUBLIC_DOMAIN", "OTHER")
 REQUEST_STATUSES = ("PENDING", "APPROVED", "REJECTED", "CANCELLED")
 REJECT_REASONS = ("DUPLICATE", "INAPPROPRIATE", "NO_RIGHTS", "TOO_LONG", "OTHER")
+REJOIN_POLICIES = ("RESTART", "SKIP")
+PLAYBACK_MODES = ("SEQUENTIAL", "SHUFFLE")
+PLAYLIST_END_ACTIONS = ("REPEAT", "STOP")
+PLAYBACK_TRIGGERS = ("SCHEDULE", "MANUAL", "REJOIN")
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -166,3 +173,97 @@ class SongRequest(Base):
 
     user: Mapped[User] = relationship(foreign_keys=[user_id])
     track: Mapped[Track] = relationship()
+
+
+class Playlist(Base):
+    __tablename__ = "playlists"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    items: Mapped[list["PlaylistItem"]] = relationship(
+        order_by="PlaylistItem.position", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class PlaylistItem(Base):
+    __tablename__ = "playlist_items"
+    __table_args__ = (
+        # 순서 일괄 변경(PUT /items) 중에는 위치가 잠깐 겹칠 수 있어 커밋 시점에 검사한다
+        UniqueConstraint(
+            "playlist_id", "position", name="uq_playlist_items_position", deferrable=True, initially="DEFERRED"
+        ),
+        CheckConstraint("position >= 0", name="ck_playlist_items_position"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id", ondelete="CASCADE"), index=True)
+    # 곡을 지우면 플레이리스트에서도 빠진다
+    track_id: Mapped[int] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+
+    track: Mapped[Track] = relationship()
+
+
+class Schedule(Base):
+    """반복 재생 구간. 시간은 timezone(기본 Asia/Seoul) 기준 벽시계 시각이다(요구사항 4.1)."""
+
+    __tablename__ = "schedules"
+    __table_args__ = (
+        CheckConstraint("start_time < end_time", name="ck_schedules_time_order"),  # 자정을 넘는 구간 금지
+        CheckConstraint("volume BETWEEN 0 AND 100", name="ck_schedules_volume"),
+        CheckConstraint("fade_in_seconds BETWEEN 0 AND 30", name="ck_schedules_fade_in"),
+        CheckConstraint("fade_out_seconds BETWEEN 0 AND 30", name="ck_schedules_fade_out"),
+        CheckConstraint(
+            "cardinality(weekdays) > 0 AND weekdays <@ ARRAY[1,2,3,4,5,6,7]::smallint[]",
+            name="ck_schedules_weekdays",
+        ),
+        CheckConstraint(_in("rejoin_policy", REJOIN_POLICIES), name="ck_schedules_rejoin_policy"),
+        CheckConstraint(_in("playback_mode", PLAYBACK_MODES), name="ck_schedules_playback_mode"),
+        CheckConstraint(_in("on_playlist_end", PLAYLIST_END_ACTIONS), name="ck_schedules_on_playlist_end"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    weekdays: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger))  # ISO 1=월 … 7=일
+    start_time: Mapped[time] = mapped_column(Time)
+    end_time: Mapped[time] = mapped_column(Time)
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Seoul")
+    # 스케줄이 참조하는 플레이리스트는 지울 수 없다(FR-006)
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id", ondelete="RESTRICT"), index=True)
+    volume: Mapped[int] = mapped_column(Integer)
+    fade_in_seconds: Mapped[int] = mapped_column(Integer, default=3)
+    fade_out_seconds: Mapped[int] = mapped_column(Integer, default=3)
+    rejoin_policy: Mapped[str] = mapped_column(String(16), default="RESTART")
+    playback_mode: Mapped[str] = mapped_column(String(16), default="SEQUENTIAL")
+    on_playlist_end: Mapped[str] = mapped_column(String(16), default="REPEAT")
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    playlist: Mapped[Playlist] = relationship()
+
+
+class PlaybackEvent(Base):
+    """재생 실행 기록: 예약 구간 시작·종료, 재합류, 수동 재생 자동 정지 결과."""
+
+    __tablename__ = "playback_events"
+    __table_args__ = (CheckConstraint(_in("trigger", PLAYBACK_TRIGGERS), name="ck_playback_events_trigger"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    track_id: Mapped[int | None] = mapped_column(ForeignKey("tracks.id", ondelete="SET NULL"))
+    schedule_id: Mapped[int | None] = mapped_column(ForeignKey("schedules.id", ondelete="SET NULL"), index=True)
+    trigger: Mapped[str] = mapped_column(String(16))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    result: Mapped[str | None] = mapped_column(String(32))
+    error_code: Mapped[str | None] = mapped_column(String(64))
