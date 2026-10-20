@@ -16,6 +16,7 @@ class FakeMPD:
         self.down = False  # True면 연결/명령이 모두 실패한다
         self.drop_next_call = False  # True면 다음 명령 한 번만 끊김 → 재연결 테스트
         self.connects = 0
+        self.version = 1
         self.timeout = None
 
     def factory(self):
@@ -48,7 +49,12 @@ class _Client:
     def status(self):
         self._check()
         f = self._f
-        st = {"volume": str(f.volume), "state": f.state, "playlistlength": str(len(f.songs))}
+        st = {
+            "volume": str(f.volume),
+            "state": f.state,
+            "playlistlength": str(len(f.songs)),
+            "playlist": str(f.version),
+        }
         if f.state != "stop" and f.songs:
             st |= {"song": str(f.pos), "elapsed": "5.0", "duration": f.songs[f.pos]["duration"]}
             if f.pos + 1 < len(f.songs):
@@ -62,16 +68,20 @@ class _Client:
             return {}
         return {**f.songs[f.pos], "pos": str(f.pos)}
 
-    def playlistinfo(self, pos):
+    def playlistinfo(self, pos=None):
         self._check()
+        if pos is None:
+            return [{**song, "pos": str(i)} for i, song in enumerate(self._f.songs)]
         return [{**self._f.songs[pos], "pos": str(pos)}]
 
     def outputs(self):
         self._check()
         return [{"outputid": "0", "outputname": "Fake Output", "outputenabled": "1"}]
 
-    def play(self):
+    def play(self, pos=None):
         self._check()
+        if pos is not None:
+            self._f.pos = pos
         self._f.state = "play"
 
     def pause(self, flag):
@@ -93,6 +103,12 @@ class _Client:
         else:
             f.state = "stop"
             f.pos = 0
+
+    def previous(self):
+        self._check()
+        f = self._f
+        if f.state != "stop":
+            f.pos = max(0, f.pos - 1)
 
     def setvol(self, v):
         self._check()

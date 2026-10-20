@@ -166,3 +166,40 @@ def test_reconnects_after_mpd_restart(admin_client, fake_mpd):
     assert not admin_client.get("/api/player/status").json()["connected"]
     fake_mpd.down = False
     assert admin_client.get("/api/player/status").json()["connected"]
+
+
+def test_queue_lists_items_in_order(admin_client):
+    items = admin_client.get("/api/player/queue").json()["items"]
+    assert [i["title"] for i in items] == ["Song A", "Song B"]
+    assert items[1] == {"title": "Song B", "artist": "Artist B", "file": "b.mp3", "duration": 40.0, "position": 1}
+
+
+def test_queue_requires_active_user(client):
+    assert client.get("/api/player/queue").status_code == 401
+
+
+def test_status_has_queue_version(admin_client):
+    assert admin_client.get("/api/player/status").json()["queue_version"] == 1
+
+
+def test_play_at_and_previous(admin_client, fake_mpd):
+    res = admin_client.post("/api/player/control", json={"action": "play_at", "position": 1})
+    assert res.status_code == 200 and res.json()["status"]["current"]["title"] == "Song B"
+    res = admin_client.post("/api/player/control", json={"action": "previous"})
+    assert res.json()["status"]["current"]["title"] == "Song A"
+
+
+def test_play_at_enforces_volume_cap(admin_client, fake_mpd):
+    fake_mpd.volume = 90
+    admin_client.post("/api/player/control", json={"action": "play_at", "position": 0})
+    assert fake_mpd.volume == 40
+
+
+@pytest.mark.parametrize("body", [{"action": "play_at"}, {"action": "play_at", "position": -1}])
+def test_play_at_validation(admin_client, body):
+    assert admin_client.post("/api/player/control", json=body).status_code == 422
+
+
+def test_play_at_out_of_range(admin_client):
+    res = admin_client.post("/api/player/control", json={"action": "play_at", "position": 9})
+    assert res.status_code == 422 and res.json()["error"]["code"] == "INVALID_POSITION"

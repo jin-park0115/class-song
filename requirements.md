@@ -316,8 +316,9 @@
 
 | HTTP | 엔드포인트 | 권한 | 목적 |
 |---|---|---|---|
-| GET | `/api/player/status` | 로그인 | 현재 곡, 진행, 상태, 볼륨, 다음 곡, 재생 원인, MPD/장치 상태 |
-| POST | `/api/player/control` | ADMIN | `action`: `play`/`pause`/`resume`/`stop`/`next`/`volume`/`mute`/`unmute`/`resume_schedule`; 볼륨은 상한으로 제한 후 `applied_volume`, `clamped` 반환 |
+| GET | `/api/player/status` | 로그인 | 현재 곡, 진행, 상태, 볼륨, 다음 곡, 재생 원인, MPD/장치 상태, 대기열 버전(`queue_version`) |
+| GET | `/api/player/queue` | 로그인 | 현재 MPD 재생 대기열(위치·제목·아티스트·길이) |
+| POST | `/api/player/control` | ADMIN | `action`: `play`/`play_at`(+`position`)/`pause`/`resume`/`stop`/`next`/`previous`/`volume`(+`value`)/`mute`/`unmute`/`resume_schedule`; 재생 시작 직전에도 볼륨 상한 강제; 볼륨은 상한으로 제한 후 `applied_volume`, `clamped` 반환 |
 | POST | `/api/player/emergency-stop` | ADMIN | 페이드 없이 즉시 정지 + 현재 구간 자동 재개 중지 |
 | GET | `/api/player/stream` | 로그인 | SSE 상태 스트림(P1) |
 | GET | `/api/admin/settings` | ADMIN | 운영 설정 조회 |
@@ -343,7 +344,7 @@
 - 선곡 리스트·일정: 확정된 플레이리스트, 재생 스케줄 조회.
 
 **관리자 화면**
-- 운영 대시보드: 서버·MPD·오디오 장치 상태, 현재 곡, 진행률, 볼륨, 다음 곡, 재생 원인, **비상 정지 버튼(항상 노출)**.
+- 운영 대시보드(**DJ 컨트롤러 형태의 운영 콘솔**): 왼쪽 덱=현재 곡(재생 중 조그 회전, 남은 시간 링), 가운데 화면=재생 대기열(행별 Play·예상 시작 시각), 오른쪽 덱=다음 곡(예상 시작 시각), 마스터 볼륨 노브(상한 표시), 서버·MPD·오디오 장치 상태, **비상 정지 버튼(항상 노출)**. 좁은 화면에서는 화면·믹서를 위, 두 덱을 아래로 재배치. 외부 라이브러리·CDN 없이 동작. 기능 없는 장식 노브는 화면에 명시.
 - 사용자 관리: **가입 승인함**(아이디·이름·가입 메모·요청 시각, 승인/거절), 학생 임시 비밀번호 발급, 사용자 목록, 비활성화/재활성화. 대시보드에 승인 대기 건수 배지.
 - 신청 승인함: 신청곡 상세, 원본 URL 열기, 승인/반려.
 - 음원 라이브러리: 이용 권리 상태·근거, 로컬 파일, 업로드/변환 작업 및 실패 처리.

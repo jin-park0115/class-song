@@ -147,6 +147,7 @@ class PlayerController:
                 "elapsed": None,
                 "duration": None,
                 "queue_length": None,
+                "queue_version": None,
                 "outputs": [],
                 "error": {"code": exc.code, "message": exc.message},
             }
@@ -172,9 +173,17 @@ class PlayerController:
             "elapsed": _float(st.get("elapsed")),
             "duration": _float(st.get("duration")) or (current or {}).get("duration"),
             "queue_length": _int(st.get("playlistlength")),
+            # 대기열이 바뀔 때마다 MPD가 올리는 번호. 화면은 이 값이 바뀔 때만 대기열을 다시 읽는다.
+            "queue_version": _int(st.get("playlist")),
             "outputs": raw["outputs"],
             "error": error,
         }
+
+    def queue(self, limit: int = 200) -> list[dict]:
+        def _read(c: MPDClient) -> list[dict]:
+            return [_song(i) for i in c.playlistinfo()[:limit]]
+
+        return self._call(_read)
 
     # ---- 제어 -------------------------------------------------------------
 
@@ -199,6 +208,17 @@ class PlayerController:
 
         self._call(_play)
 
+    def play_at(self, position: int, max_volume: int) -> None:
+        def _play_at(c: MPDClient) -> None:
+            st = c.status()
+            length = _int(st.get("playlistlength")) or 0
+            if not 0 <= position < length:
+                raise PlayerError(422, "INVALID_POSITION", "대기열에 없는 곡 위치입니다.")
+            self._enforce_cap(c, st, max_volume)
+            c.play(position)
+
+        self._call(_play_at)
+
     def pause(self) -> None:
         self._call(lambda c: c.pause(1))
 
@@ -214,6 +234,9 @@ class PlayerController:
 
     def next(self) -> None:
         self._call(lambda c: c.next())
+
+    def previous(self) -> None:
+        self._call(lambda c: c.previous())
 
     def set_volume(self, requested: int, max_volume: int) -> VolumeResult:
         """요청값을 상한으로 자른 뒤 적용한다(NFR-006). 음소거 중이면 음소거를 해제한다."""

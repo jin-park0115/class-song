@@ -1,63 +1,173 @@
 {% extends "base.html" %}
-{% block title %}운영 대시보드 · AX2 Jukebox{% endblock %}
+{% block title %}운영 콘솔 · AX2 Jukebox{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', path='deck.css') }}">{% endblock %}
+{% block bodyclass %}deck-page{% endblock %}
 {% block topbar %}
 <span class="spacer"></span>
 <span id="who" class="muted"></span>
 <button id="logout" class="btn small">로그아웃</button>
 {% endblock %}
+{% macro knob(label, v) -%}
+<div class="knob-unit" aria-hidden="true">
+  <span class="knob-label">{{ label }}</span>
+  <div class="knob" style="--v: {{ v }}"><i class="knob-cap"></i></div>
+  <span class="knob-scale"><b>-</b><b>+</b></span>
+</div>
+{%- endmacro %}
+{% macro fader(label, pos, area, cls="") -%}
+<div class="fader {{ cls }}" style="grid-area: {{ area }}" aria-hidden="true">
+  {% if label %}<span class="fader-label">{{ label }}</span>{% endif %}
+  <div class="fader-slot"><i class="fader-cap" style="--p: {{ pos }}"></i></div>
+</div>
+{%- endmacro %}
 {% block content %}
-<p id="page-error" class="alert" role="alert" hidden></p>
+<div class="console">
+  <p id="page-error" class="alert" role="alert" hidden></p>
 
-<section class="card emergency">
-  <button id="emergency" class="btn danger wide" aria-describedby="emergency-help">■ 비상 정지</button>
-  <p id="emergency-help" class="muted small">페이드 없이 즉시 재생을 멈춥니다.</p>
-</section>
+  <div class="device" id="device" data-state="unknown">
+    <!-- ── 왼쪽 덱: 현재 곡 ─────────────────────────────── -->
+    <section class="deck deck-left" aria-label="왼쪽 덱 · 지금 재생">
+      <div class="deck-top">
+        <div class="navpads" role="group" aria-label="목록 탐색">
+          <button class="pad sq" data-scroll="-1" aria-label="목록 위로">‹</button>
+          <button class="pad sq" data-scroll="1" aria-label="목록 아래로">›</button>
+          <button class="pad sq" data-action="previous" aria-label="이전 곡">⏮</button>
+          <button class="pad sq" data-action="next" aria-label="다음 곡">⏭</button>
+        </div>
+        <div class="knobs">
+          {{ knob("GAIN", 0.5) }}{{ knob("TREBLE", 0.55) }}{{ knob("BASS", 0.45) }}
+          {{ knob("GAIN", 0.5) }}{{ knob("TREBLE", 0.5) }}{{ knob("BASS", 0.6) }}
+        </div>
+      </div>
 
-<section class="card">
-  <div class="row between">
-    <h2>지금 재생</h2>
-    <span id="state-badge" class="badge">확인 중…</span>
-  </div>
-  <p id="current-title" class="title">—</p>
-  <p id="current-artist" class="muted">&nbsp;</p>
-  <div class="progress" role="progressbar" aria-label="재생 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-    <div id="progress-bar"></div>
-  </div>
-  <p class="row between small muted"><span id="elapsed">0:00</span><span id="remaining">-0:00</span></p>
-  <p class="small">다음 곡: <span id="next-title">—</span></p>
+      <div class="jog" id="jog-left">
+        <div class="jog-ring"></div>
+        <div class="jog-platter"><i class="jog-notch"></i></div>
+        <div class="jog-sheen"></div>
+        <button class="jog-cmd" data-action="previous" aria-label="이전 곡">◀ PREVIOUS</button>
+        <div class="jog-center">
+          <svg class="jog-progress" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="46" class="track"></circle>
+            <circle cx="50" cy="50" r="46" class="bar" id="left-ring"></circle>
+          </svg>
+          <span class="jog-artist" id="left-artist">—</span>
+          <span class="art" id="left-art"></span>
+          <span class="jog-title" id="left-title">—</span>
+          <span class="jog-time" id="left-time" aria-label="남은 시간">-0:00</span>
+        </div>
+        <span class="jog-tag l" aria-hidden="true">MIN</span><span class="jog-tag r" aria-hidden="true">MAX</span>
+      </div>
 
-  <div class="controls" role="group" aria-label="재생 제어">
-    <button class="btn primary" data-action="play">▶ 재생</button>
-    <button class="btn" data-action="pause">❚❚ 일시정지</button>
-    <button class="btn" data-action="resume">⏵ 이어 재생</button>
-    <button class="btn" data-action="next">⏭ 다음 곡</button>
-    <button class="btn" data-action="stop">■ 정지</button>
-  </div>
-</section>
+      <div class="deck-bottom">
+        <div class="bigbtns">
+          <button class="bigbtn cue" data-action="stop" aria-label="정지">CUE</button>
+          <button class="bigbtn play" data-toggle aria-label="재생 / 일시정지">▶/❚❚</button>
+        </div>
+        <div class="pads" role="group" aria-label="재생 패드">
+          <button class="pad blue" data-action="previous">PREV</button>
+          <button class="pad orange" data-action="stop">STOP</button>
+          <button class="pad" data-toggle>▶❚❚</button>
+          <button class="pad mute-pad" data-mute>MUTE</button>
+        </div>
+      </div>
+    </section>
 
-<section class="card">
-  <div class="row between">
-    <h2>볼륨</h2>
-    <span class="muted small">최대 상한 <strong id="max-volume">—</strong>%</span>
-  </div>
-  <div class="row">
-    <input id="volume" type="range" min="0" max="100" step="1" aria-label="볼륨" aria-describedby="volume-value">
-    <output id="volume-value" for="volume">—</output>
-    <button id="mute" class="btn small" aria-pressed="false">음소거</button>
-  </div>
-  <p id="volume-note" class="muted small" aria-live="polite"></p>
-</section>
+    <!-- ── 가운데: 비상 정지 · 화면 · 믹서 ──────────────── -->
+    <section class="center" aria-label="화면과 믹서">
+      <button id="emergency" class="estop" aria-describedby="estop-help">
+        <span class="estop-led" aria-hidden="true"></span>■ 비상 정지<small id="estop-help">페이드 없이 즉시 멈춤</small>
+      </button>
 
-<section class="card">
-  <h2>시스템 상태</h2>
-  <dl class="status-list">
-    <dt>MPD 연결</dt><dd id="mpd-conn">—</dd>
-    <dt>오디오 출력</dt><dd id="outputs">—</dd>
-    <dt>대기열</dt><dd id="queue">—</dd>
-    <dt>오류</dt><dd id="player-error">없음</dd>
-    <dt>마지막 갱신</dt><dd id="updated">—</dd>
-  </dl>
-</section>
+      <div class="screen-bezel">
+        <div class="screen">
+          <header class="screen-head">
+            <h2>재생 대기열</h2>
+            <span class="screen-pill" id="queue-count">0곡</span>
+          </header>
+          <ol class="queue" id="queue" aria-label="재생 대기열" tabindex="0"></ol>
+          <footer class="screen-foot" aria-live="polite">
+            <span><i class="led" id="led-mpd"></i>MPD <b id="mpd-conn">—</b></span>
+            <span><i class="led" id="led-out"></i><b id="outputs">—</b></span>
+            <span class="muted" id="updated">—</span>
+            <span class="screen-error" id="player-error" hidden></span>
+          </footer>
+        </div>
+      </div>
+
+      <div class="mixer">
+        {{ fader("", 0.35, "p1", "pitch") }}
+        {{ fader("CHAN 1", 0.3, "c1") }}
+        <div class="meter" style="grid-area: m1" aria-hidden="true">{% for i in range(10) %}<i></i>{% endfor %}</div>
+        <div class="mixer-mid">
+          <span class="knob-label">MASTER VOL</span>
+          <div class="knob big" id="volume-knob" role="slider" tabindex="0"
+               aria-label="마스터 볼륨" aria-valuemin="0" aria-valuemax="40" aria-valuenow="0"
+               aria-valuetext="0%" style="--v: 0; --cap: .4">
+            <i class="knob-cap"></i>
+          </div>
+          <div class="vol-lcd"><b id="volume-value">—</b><span>MAX <b id="max-volume">—</b></span></div>
+          <p class="vol-note" id="volume-note" aria-live="polite"></p>
+        </div>
+        <div class="meter r" style="grid-area: m2" aria-hidden="true">{% for i in range(10) %}<i></i>{% endfor %}</div>
+        {{ fader("CHAN 2", 0.3, "c2") }}
+        {{ fader("", 0.6, "p2", "pitch") }}
+        <div class="xfader" aria-hidden="true"><span>‹</span><div class="xfader-slot"><i></i></div><span>›</span></div>
+      </div>
+    </section>
+
+    <!-- ── 오른쪽 덱: 다음 곡 ───────────────────────────── -->
+    <section class="deck deck-right" aria-label="오른쪽 덱 · 다음 곡">
+      <div class="deck-top">
+        <div class="knobs">
+          {{ knob("FX", 0.5) }}{{ knob("PHONES", 0.4) }}{{ knob("MASTER", 0.7) }}
+          {{ knob("CUE", 0.5) }}{{ knob("MASTER", 0.6) }}{{ knob("CUE MIX", 0.5) }}
+        </div>
+        <div class="navpads" role="group" aria-label="목록 탐색">
+          <button class="pad sq" data-scroll="-1" aria-label="목록 위로">‹</button>
+          <button class="pad sq" data-scroll="1" aria-label="목록 아래로">›</button>
+          <button class="pad sq" data-action="previous" aria-label="이전 곡">⏮</button>
+          <button class="pad sq" data-action="next" aria-label="다음 곡">⏭</button>
+        </div>
+      </div>
+
+      <div class="jog" id="jog-right">
+        <div class="jog-ring"></div>
+        <div class="jog-platter"><i class="jog-notch"></i></div>
+        <div class="jog-sheen"></div>
+        <button class="jog-cmd" data-action="next" aria-label="다음 곡">NEXT ▶</button>
+        <div class="jog-center">
+          <svg class="jog-progress" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="46" class="track"></circle>
+          </svg>
+          <span class="jog-artist">NEXT</span>
+          <span class="art" id="right-art"></span>
+          <span class="jog-title" id="right-title">없음</span>
+          <span class="jog-time" id="right-time" aria-label="예상 시작 시각">--:--</span>
+        </div>
+        <span class="jog-tag l" aria-hidden="true">MIN</span><span class="jog-tag r" aria-hidden="true">MAX</span>
+      </div>
+
+      <div class="deck-bottom">
+        <div class="pads" role="group" aria-label="재생 패드">
+          <button class="pad blue" data-action="next">NEXT</button>
+          <button class="pad orange" data-action="stop">STOP</button>
+          <button class="pad" data-toggle>▶❚❚</button>
+          <button class="pad" data-refresh>SYNC</button>
+        </div>
+        <div class="bigbtns">
+          <button class="bigbtn cue" data-action="stop" aria-label="정지">CUE</button>
+          <button class="bigbtn play" data-action="next" aria-label="다음 곡 재생">▶/❚❚</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <p class="legend muted small">
+    상태: <b id="state-text">확인 중…</b> ·
+    출력 <span id="outputs-legend">—</span> ·
+    GAIN·TREBLE·BASS 등 회색 노브는 장식이며 동작하지 않습니다.
+  </p>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', path='admin.js') }}"></script>

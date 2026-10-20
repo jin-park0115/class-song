@@ -19,17 +19,22 @@ def get_player(request: Request) -> PlayerController:
 Player = Annotated[PlayerController, Depends(get_player)]
 
 # resume_schedule 은 스케줄러가 생기는 STEP 03에서 추가한다.
-Action = Literal["play", "pause", "resume", "stop", "next", "volume", "mute", "unmute"]
+Action = Literal[
+    "play", "play_at", "pause", "resume", "stop", "next", "previous", "volume", "mute", "unmute"
+]
 
 
 class ControlIn(BaseModel):
     action: Action
     value: int | None = Field(default=None, ge=0, le=100)
+    position: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def _volume_needs_value(self) -> "ControlIn":
+    def _required_fields(self) -> "ControlIn":
         if self.action == "volume" and self.value is None:
             raise ValueError("volume 동작에는 0–100 사이의 value 가 필요합니다.")
+        if self.action == "play_at" and self.position is None:
+            raise ValueError("play_at 동작에는 대기열 위치 position 이 필요합니다.")
         return self
 
 
@@ -42,6 +47,14 @@ def status(_: ActiveUser, player: Player, db: DB) -> dict:
     return _status(player, db)
 
 
+@router.get("/queue")
+def queue(_: ActiveUser, player: Player) -> dict:
+    try:
+        return {"items": player.queue()}
+    except PlayerError as exc:
+        raise ApiError(exc.status, exc.code, exc.message) from exc
+
+
 @router.post("/control")
 def control(body: ControlIn, admin: AdminUser, player: Player, db: DB) -> dict:
     max_volume = get_max_volume(db)
@@ -51,6 +64,9 @@ def control(body: ControlIn, admin: AdminUser, player: Player, db: DB) -> dict:
         match body.action:
             case "play":
                 player.play(max_volume)
+            case "play_at":
+                player.play_at(body.position, max_volume)
+                payload |= {"position": body.position}
             case "pause":
                 player.pause()
             case "resume":
@@ -59,6 +75,8 @@ def control(body: ControlIn, admin: AdminUser, player: Player, db: DB) -> dict:
                 player.stop()
             case "next":
                 player.next()
+            case "previous":
+                player.previous()
             case "mute":
                 player.mute()
             case "volume":

@@ -117,6 +117,12 @@ def test_real_mpd_full_cycle(player):
 
     player.next()
     assert player.status()["current"]["title"] == "Tone 660"
+    player.previous()
+    assert player.status()["current"]["title"] == "Tone 440"
+    player.play_at(1, max_volume=40)
+    assert player.status()["current"]["title"] == "Tone 660"
+    assert [i["title"] for i in player.queue()] == ["Tone 440", "Tone 660"]
+    assert player.status()["queue_version"] is not None
 
     player.emergency_stop()
     assert player.status()["state"] == "stop"
