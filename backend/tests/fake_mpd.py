@@ -17,6 +17,8 @@ class FakeMPD:
         self.drop_next_call = False  # True면 다음 명령 한 번만 끊김 → 재연결 테스트
         self.connects = 0
         self.version = 1
+        self.updates: list = []
+        self.missing: set[str] = set()  # add 시 "파일 없음"을 낼 경로
         self.timeout = None
 
     def factory(self):
@@ -109,6 +111,23 @@ class _Client:
         f = self._f
         if f.state != "stop":
             f.pos = max(0, f.pos - 1)
+
+    def update(self, uri=None):
+        self._check()
+        self._f.updates.append(uri)
+        return "1"
+
+    def add(self, uri):
+        self._check()
+        if uri in self._f.missing:
+            raise CommandError("[50@0] {add} No such directory")
+        self._f.songs.append({"file": uri, "duration": "30.0"})
+        self._f.version += 1
+
+    def delete(self, pos):
+        self._check()
+        self._f.songs.pop(pos)
+        self._f.version += 1
 
     def setvol(self, v):
         self._check()

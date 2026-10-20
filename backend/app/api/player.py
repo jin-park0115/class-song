@@ -1,10 +1,16 @@
 from typing import Annotated, Literal
 
+import httpx
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import select
 
 from app.auth.deps import DB, ActiveUser, AdminUser
+from app.config import get_settings
 from app.errors import ApiError
+from app.models import Track
 from app.services import audit
 from app.services.player import PlayerController, PlayerError
 from app.services.settings import get_max_volume
@@ -38,8 +44,27 @@ class ControlIn(BaseModel):
         return self
 
 
+def _enrich(db: DB, songs: list[dict | None]) -> None:
+    """MPD 파일 경로(<track-id>.<ext>)로 DB 곡 정보를 찾아 제목·아티스트·썸네일을 채운다."""
+    files = {s["file"] for s in songs if s and s.get("file")}
+    if not files:
+        return
+    tracks = {t.media_path: t for t in db.scalars(select(Track).where(Track.media_path.in_(files)))}
+    for song in songs:
+        t = tracks.get(song["file"]) if song else None
+        if t:
+            song |= {
+                "title": t.title,
+                "artist": t.artist_or_channel or song.get("artist"),
+                "thumbnail_url": t.thumbnail_url,
+                "track_id": t.id,
+            }
+
+
 def _status(player: PlayerController, db: DB) -> dict:
-    return {**player.status(), "max_volume": get_max_volume(db)}
+    st = player.status()
+    _enrich(db, [st["current"], st["next"]])
+    return {**st, "max_volume": get_max_volume(db)}
 
 
 @router.get("/status")
@@ -48,11 +73,13 @@ def status(_: ActiveUser, player: Player, db: DB) -> dict:
 
 
 @router.get("/queue")
-def queue(_: ActiveUser, player: Player) -> dict:
+def queue(_: ActiveUser, player: Player, db: DB) -> dict:
     try:
-        return {"items": player.queue()}
+        items = player.queue()
     except PlayerError as exc:
         raise ApiError(exc.status, exc.code, exc.message) from exc
+    _enrich(db, items)
+    return {"items": items}
 
 
 @router.post("/control")
@@ -109,3 +136,28 @@ def emergency_stop(admin: AdminUser, player: Player, db: DB) -> dict:
     audit.record(db, admin.id, "player.emergency_stop", {})
     db.commit()
     return {"ok": True, "status": _status(player, db)}
+
+
+@router.get("/monitor")
+async def monitor(_: AdminUser) -> StreamingResponse:
+    """MPD httpd 출력을 관리자 브라우저로 전달한다(노트북·원격 확인용 모니터 스피커)."""
+    upstream = get_settings().mpd_monitor_url
+    if not upstream:
+        raise ApiError(404, "MONITOR_DISABLED", "모니터 스트림이 설정되지 않았습니다.")
+    client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=None))
+    try:
+        res = await client.send(client.build_request("GET", upstream), stream=True)
+    except httpx.HTTPError as exc:
+        await client.aclose()
+        raise ApiError(503, "MONITOR_UNAVAILABLE", "모니터 스트림에 연결할 수 없습니다. (재생 중일 때만 열립니다)") from exc
+
+    async def close() -> None:
+        await res.aclose()
+        await client.aclose()
+
+    return StreamingResponse(
+        res.aiter_raw(),
+        media_type=res.headers.get("content-type", "audio/mpeg"),
+        headers={"Cache-Control": "no-store"},
+        background=BackgroundTask(close),
+    )

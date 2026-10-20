@@ -1,0 +1,60 @@
+# 노트북에서 한 번에 띄우기:  docker compose up -d --build
+# 관리자 만들기:             docker compose exec app python -m app.cli create --login-id admin --name 운영자
+# 접속:                      http://localhost:8000
+name: ax2-jukebox
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jukebox
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-jukebox-local}
+      POSTGRES_DB: jukebox
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jukebox -d jukebox"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  mpd:
+    build: ./deploy/docker/mpd
+    volumes:
+      - media:/srv/ax2-jukebox/media:ro
+      - mpdstate:/var/lib/mpd
+    # 6600(제어)·8001(스트림)은 외부에 열지 않는다. 앱만 내부 네트워크로 접근한다.
+    restart: unless-stopped
+
+  app:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+      mpd:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+psycopg://jukebox:${DB_PASSWORD:-jukebox-local}@db:5432/jukebox
+      MPD_HOST: mpd
+      MPD_PORT: "6600"
+      MEDIA_DIR: /srv/ax2-jukebox/media
+      MPD_MONITOR_URL: http://mpd:8001/
+      COOKIE_SECURE: "false"
+    volumes:
+      - media:/srv/ax2-jukebox/media
+    ports:
+      # 같은 Wi-Fi의 다른 기기(휴대폰)에서도 http://<노트북 IP>:8000 으로 접속할 수 있다.
+      # 노트북에서만 쓰려면 "127.0.0.1:8000:8000" 으로 바꾼다.
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:
+  mpdstate:

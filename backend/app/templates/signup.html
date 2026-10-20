@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}회원가입 · AX2 Jukebox{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>회원가입</h1>
+  <p class="muted small">가입하면 관리자가 확인한 뒤 승인합니다. 승인되면 곡을 신청할 수 있어요.</p>
+  <form id="signup-form" novalidate>
+    <label for="login_id">아이디</label>
+    <input id="login_id" autocomplete="username" required autofocus aria-describedby="id-help">
+    <p id="id-help" class="muted small hint">영소문자·숫자·_ 4–20자</p>
+    <label for="name">이름</label>
+    <input id="name" autocomplete="name" required maxlength="50">
+    <label for="password">비밀번호</label>
+    <input id="password" type="password" autocomplete="new-password" required aria-describedby="pw-help">
+    <p id="pw-help" class="muted small hint">10자 이상, 아이디를 포함할 수 없어요. 다른 사이트와 같은 비밀번호는 쓰지 마세요.</p>
+    <label for="password2">비밀번호 확인</label>
+    <input id="password2" type="password" autocomplete="new-password" required>
+    <label for="note">가입 메모 <span class="muted">(선택)</span></label>
+    <input id="note" maxlength="200" placeholder="예: AX2 3번 박진" aria-describedby="note-help">
+    <p id="note-help" class="muted small hint">관리자가 본인인지 확인할 때 봅니다.</p>
+    <p id="err" class="alert" role="alert" hidden></p>
+    <button type="submit" class="btn primary wide">가입 신청</button>
+  </form>
+  <p class="muted small center-text">이미 계정이 있나요? <a href="/login">로그인</a></p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById("signup-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = (id) => document.getElementById(id).value;
+    const err = document.getElementById("err");
+    err.hidden = true;
+    if (v("password") !== v("password2")) {
+      err.textContent = "비밀번호가 서로 다릅니다.";
+      err.hidden = false;
+      return;
+    }
+    try {
+      const me = await api.post("/api/auth/signup", {
+        login_id: v("login_id"), name: v("name"), password: v("password"), signup_note: v("note") || null,
+      });
+      location.href = api.homeFor(me);
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+    }
+  });
+</script>
+{% endblock %}

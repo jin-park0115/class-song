@@ -1,9 +1,11 @@
 import os
+import tempfile
 
-# app 모듈을 가져오기 전에 테스트 DB를 지정해야 엔진이 테스트 DB로 만들어진다.
+# app 모듈을 가져오기 전에 테스트 DB·음원 경로를 지정해야 엔진·설정이 테스트용으로 만들어진다.
 os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+psycopg://jukebox:jukebox@localhost:5432/jukebox_test"
 )
+os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="jukebox-media-")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -15,6 +17,7 @@ from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import User  # noqa: E402
 from app.services.player import PlayerController  # noqa: E402
+from app.services.youtube import VideoMeta  # noqa: E402
 from tests.fake_mpd import FakeMPD  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
@@ -65,10 +68,29 @@ def fake_mpd():
     return FakeMPD()
 
 
+class FakeYouTube:
+    """oEmbed 대신 쓰는 메타데이터 조회. available=False 면 조회 실패를 흉내 낸다."""
+
+    def __init__(self):
+        self.available = True
+        self.calls: list[str] = []
+
+    def __call__(self, video_id: str) -> VideoMeta | None:
+        self.calls.append(video_id)
+        if not self.available:
+            return None
+        return VideoMeta(f"Song {video_id}", "Test Channel", f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg")
+
+
 @pytest.fixture
-def client(fake_mpd):
+def fake_youtube():
+    return FakeYouTube()
+
+
+@pytest.fixture
+def client(fake_mpd, fake_youtube):
     player = PlayerController("fake", 0, client_factory=fake_mpd.factory)
-    with TestClient(create_app(player)) as c:
+    with TestClient(create_app(player, metadata_fetcher=fake_youtube)) as c:
         yield c
 
 
@@ -85,3 +107,21 @@ def admin_client(client, make_user):
     csrf = login(client, "admin01")
     client.headers["X-CSRF-Token"] = csrf
     return client
+
+
+@pytest.fixture
+def as_user(client, make_user):
+    """다른 계정으로 바꿔 로그인한다: as_user("student01") → CSRF 헤더까지 설정."""
+
+    def _as(login_id: str, role: str = "STUDENT", status: str = "ACTIVE"):
+        from sqlalchemy import select
+
+        with SessionLocal() as s:
+            exists = s.scalar(select(User.id).where(User.login_id == login_id))
+        if not exists:
+            make_user(login_id, role=role, status=status)
+        client.cookies.clear()
+        client.headers["X-CSRF-Token"] = login(client, login_id)
+        return client
+
+    return _as

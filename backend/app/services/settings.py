@@ -12,3 +12,11 @@ def get_setting(db: Session, key: str, default: object) -> object:
 def get_max_volume(db: Session) -> int:
     value = get_setting(db, "max_volume", get_settings().default_max_volume)
     return max(0, min(100, int(value)))
+
+
+def get_int_setting(db: Session, key: str, default: int) -> int:
+    return int(get_setting(db, key, default))
+
+
+def get_bool_setting(db: Session, key: str, default: bool) -> bool:
+    return bool(get_setting(db, key, default))

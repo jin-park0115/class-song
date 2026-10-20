@@ -207,6 +207,7 @@
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
 }
 .art:empty::after { content: "♪"; }
+.art.has-img { background-size: cover, cover; background-position: center; color: transparent; }
 
 /* ── 덱 하단: 큰 버튼 + 패드 ───────────────────────────── */
 .deck-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 3cqi; }
@@ -253,6 +254,10 @@
   color: #fff; background: linear-gradient(#a3221d, #6f1411);
   box-shadow: 0 0 12px color-mix(in srgb, var(--led-red) 60%, transparent), inset 0 1px 0 rgba(255,255,255,.2);
 }
+.pad.listen[aria-pressed="true"] {
+  color: #062b05; background: linear-gradient(#8ef08a, #4fc24b);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--led-green) 60%, transparent), inset 0 1px 0 rgba(255,255,255,.4);
+}
 button:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ── 비상 정지 ───────────────────────────────────────── */
@@ -293,7 +298,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .queue { list-style: none; margin: 0; padding: 0 2cqi; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #3a3d42 transparent; outline: none; }
 .queue:focus-visible { box-shadow: inset 0 0 0 2px var(--led-blue); }
 .queue li {
-  display: grid; grid-template-columns: 5cqi 8.5cqi 1fr auto 11cqi; align-items: center; gap: 2.5cqi;
+  display: grid; grid-template-columns: 5cqi 8.5cqi 1fr auto 11cqi 5cqi; align-items: center; gap: 2.5cqi;
   padding: 1.5cqi 3cqi;
   border-bottom: 1px solid #22252a;
   font-size: clamp(10px, 3.6cqi, 14px);
@@ -308,6 +313,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 .queue li .row-play:hover { background: #2c2f34; color: #fff; }
 .queue li .row-play:focus-visible { outline: 2px solid var(--led-blue); }
+.queue li .row-remove {
+  border: 0; background: transparent; color: #6b7078; cursor: pointer; font-size: .8em; padding: .3em; border-radius: 4px;
+}
+.queue li .row-remove:hover { color: #ff8a84; background: #2c2f34; }
+.queue li .row-remove:focus-visible { outline: 2px solid var(--led-blue); }
 .queue li.current { background: linear-gradient(90deg, #2b2f36, #22252a); border-radius: 4px; border-bottom-color: transparent; }
 .queue li.current .name { color: #fff; font-weight: 700; }
 .queue li.current .idx { color: var(--led-green); }

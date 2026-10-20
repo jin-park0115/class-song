@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}승인 대기 · AX2 Jukebox{% endblock %}
+{% block topbar %}<span class="spacer"></span><button id="logout" class="btn small">로그아웃</button>{% endblock %}
+{% block content %}
+<section class="card narrow center-text">
+  <p class="big-icon" aria-hidden="true">⏳</p>
+  <h1>승인을 기다리는 중</h1>
+  <p id="msg"><b id="who"></b>님의 가입 신청이 접수됐어요.<br>관리자가 승인하면 이 화면이 자동으로 넘어갑니다.</p>
+  <p class="muted small" aria-live="polite">마지막 확인: <span id="checked">—</span></p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  async function check() {
+    try {
+      const me = await api.get("/api/auth/me");
+      document.getElementById("who").textContent = me.name;
+      document.getElementById("checked").textContent = new Date().toLocaleTimeString("ko-KR");
+      const next = api.homeFor(me);
+      if (next !== "/pending") location.href = next;
+    } catch (ex) {
+      if (ex.status === 401) location.href = "/login";
+    }
+  }
+  check();
+  setInterval(check, 10000);
+  document.getElementById("logout").addEventListener("click", async () => {
+    try { await api.post("/api/auth/logout"); } finally { location.href = "/login"; }
+  });
+</script>
+{% endblock %}

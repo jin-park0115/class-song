@@ -272,6 +272,7 @@
 | POST | `/api/admin/requests/{id}/review` | ADMIN | 승인/반려(`decision`, `reject_reason`, `reject_note`) |
 | GET | `/api/tracks?status=approved\|ready&q=&sort=` | 로그인 | 승인/재생 가능 곡 조회 |
 | GET | `/api/tracks/{id}` | 로그인 | 곡 상세 |
+| GET | `/api/admin/tracks` | ADMIN | 음원 라이브러리(승인된 곡·파일 있는 곡, 권리 정보 포함) |
 | PATCH | `/api/admin/tracks/{id}` | ADMIN | 메타데이터 수동 수정, 이용 권리 상태·근거 입력 |
 | POST | `/api/admin/tracks/{id}/metadata/refresh` | ADMIN | 메타데이터 재조회 |
 
@@ -318,6 +319,9 @@
 |---|---|---|---|
 | GET | `/api/player/status` | 로그인 | 현재 곡, 진행, 상태, 볼륨, 다음 곡, 재생 원인, MPD/장치 상태, 대기열 버전(`queue_version`) |
 | GET | `/api/player/queue` | 로그인 | 현재 MPD 재생 대기열(위치·제목·아티스트·길이) |
+| POST | `/api/admin/queue` | ADMIN | `READY` 곡을 재생 대기열 끝에 추가(플레이리스트 편성 전 임시 경로, STEP 03에서 플레이리스트로 대체) |
+| DELETE | `/api/admin/queue/{position}` | ADMIN | 대기열에서 곡 제거 |
+| GET | `/api/player/monitor` | ADMIN | MPD httpd 출력 중계(노트북·원격 모니터 듣기, `MPD_MONITOR_URL` 설정 시만) |
 | POST | `/api/player/control` | ADMIN | `action`: `play`/`play_at`(+`position`)/`pause`/`resume`/`stop`/`next`/`previous`/`volume`(+`value`)/`mute`/`unmute`/`resume_schedule`; 재생 시작 직전에도 볼륨 상한 강제; 볼륨은 상한으로 제한 후 `applied_volume`, `clamped` 반환 |
 | POST | `/api/player/emergency-stop` | ADMIN | 페이드 없이 즉시 정지 + 현재 구간 자동 재개 중지 |
 | GET | `/api/player/stream` | 로그인 | SSE 상태 스트림(P1) |

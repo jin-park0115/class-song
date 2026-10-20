@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}관리 · AX2 Jukebox{% endblock %}
+{% block bodyclass %}wide{% endblock %}
+{% block topbar %}
+<a class="btn small" href="/admin">← 운영 콘솔</a>
+<span class="spacer"></span>
+<span id="who" class="muted"></span>
+<button id="logout" class="btn small">로그아웃</button>
+{% endblock %}
+{% block content %}
+<p id="page-error" class="alert" role="alert" hidden></p>
+<p id="page-ok" class="ok-msg" role="status" hidden></p>
+
+<nav class="tabs" role="tablist" aria-label="관리 메뉴">
+  <button role="tab" id="tab-signups" aria-controls="panel-signups" data-tab="signups">가입 승인 <span class="count" id="c-signups"></span></button>
+  <button role="tab" id="tab-requests" aria-controls="panel-requests" data-tab="requests">신청 승인 <span class="count" id="c-requests"></span></button>
+  <button role="tab" id="tab-library" aria-controls="panel-library" data-tab="library">음원 라이브러리 <span class="count" id="c-library"></span></button>
+</nav>
+
+<section class="card" role="tabpanel" id="panel-signups" aria-labelledby="tab-signups">
+  <div class="row between">
+    <h2>회원</h2>
+    <select id="user-filter" aria-label="회원 상태">
+      <option value="PENDING_APPROVAL">승인 대기</option>
+      <option value="ACTIVE">사용 중</option>
+      <option value="REJECTED">거절</option>
+      <option value="DISABLED">비활성</option>
+      <option value="">전체</option>
+    </select>
+  </div>
+  <ul class="tracklist" id="users"></ul>
+</section>
+
+<section class="card" role="tabpanel" id="panel-requests" aria-labelledby="tab-requests" hidden>
+  <div class="row between">
+    <h2>곡 신청</h2>
+    <select id="req-filter" aria-label="신청 상태">
+      <option value="PENDING">승인 대기</option>
+      <option value="APPROVED">승인</option>
+      <option value="REJECTED">반려</option>
+      <option value="CANCELLED">취소</option>
+    </select>
+  </div>
+  <ul class="tracklist" id="requests"></ul>
+</section>
+
+<section class="card" role="tabpanel" id="panel-library" aria-labelledby="tab-library" hidden>
+  <h2>음원 라이브러리</h2>
+  <p class="muted small">
+    승인된 곡이에요. ① 이용 권리를 확인하고 → ② 적법하게 보유한 MP3/OGG/FLAC 파일을 올리면 <b>재생 가능</b>이 되고 → ③ 대기열에 넣을 수 있어요.
+    YouTube 영상을 내려받아 올리지 마세요.
+  </p>
+  <ul class="library" id="library"></ul>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', path='manage.js') }}"></script>
+{% endblock %}

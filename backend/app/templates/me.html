@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}AX2 Jukebox{% endblock %}
+{% block topbar %}
+<span class="spacer"></span>
+<span id="who" class="muted"></span>
+<a class="btn small" href="/password">비밀번호</a>
+<button id="logout" class="btn small">로그아웃</button>
+{% endblock %}
+{% block content %}
+<p id="page-error" class="alert" role="alert" hidden></p>
+
+<section class="nowplaying" aria-label="지금 재생">
+  <div class="np-art" id="np-art"></div>
+  <div class="np-body">
+    <p class="np-label"><span class="np-dot" id="np-dot" aria-hidden="true"></span><span id="np-state">확인 중…</span></p>
+    <p class="np-title" id="np-title">—</p>
+    <p class="np-artist" id="np-artist">&nbsp;</p>
+    <div class="np-bar" aria-hidden="true"><i id="np-bar"></i></div>
+    <p class="np-next">다음 곡 · <span id="np-next">—</span></p>
+  </div>
+</section>
+
+<section class="card">
+  <div class="row between">
+    <h2>곡 신청</h2>
+    <span class="muted small" id="quota"></span>
+  </div>
+  <form id="req-form" novalidate>
+    <label for="url">YouTube 주소</label>
+    <div class="row">
+      <input id="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=… 또는 https://youtu.be/…" required>
+      <button type="button" id="preview-btn" class="btn">확인</button>
+    </div>
+    <div id="preview" class="preview" hidden aria-live="polite"></div>
+    <p id="req-err" class="alert" role="alert" hidden></p>
+    <p id="req-ok" class="ok-msg" role="status" hidden></p>
+  </form>
+  <p class="muted small">YouTube 주소는 곡을 찾고 검토하는 데만 씁니다. 관리자가 승인하고 음원을 준비하면 강의실에서 재생돼요.</p>
+</section>
+
+<section class="card">
+  <h2>내 신청곡</h2>
+  <ul class="tracklist" id="mine"><li class="muted">불러오는 중…</li></ul>
+</section>
+
+<section class="card">
+  <div class="row between">
+    <h2>승인된 곡</h2>
+    <input id="q" class="search" type="search" placeholder="곡명·채널 검색" aria-label="승인된 곡 검색">
+  </div>
+  <ul class="tracklist" id="approved"><li class="muted">불러오는 중…</li></ul>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', path='student.js') }}"></script>
+{% endblock %}

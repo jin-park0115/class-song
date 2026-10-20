@@ -5,7 +5,8 @@
 - 요구사항: [requirements.md](requirements.md)
 - 개발 가이드: [docs/development-guide.md](docs/development-guide.md)
 - 강의실 서버 오디오 설정: [docs/ubuntu-audio-setup.md](docs/ubuntu-audio-setup.md)
-- 진행 기록: [STEP 01](docs/step-01-report.md)
+- **노트북에서 먼저 해보기(Docker)**: [docs/laptop-test-guide.md](docs/laptop-test-guide.md)
+- 진행 기록: [STEP 01](docs/step-01-report.md) · [STEP 02](docs/step-02-report.md)
 
 ## 구성
 
@@ -15,7 +16,17 @@
                      PlayerController ── MPD(127.0.0.1) ── ALSA ── 앰프
 ```
 
-## 빠른 시작 (개발)
+## 노트북에서 바로 실행 (Docker)
+
+```bash
+docker compose up -d --build
+docker compose exec app python -m app.cli create --login-id admin --name 운영자
+# http://localhost:8000  → 관리자 로그인 / 다른 창에서 학생 회원가입
+```
+
+자세한 순서는 [노트북 테스트 가이드](docs/laptop-test-guide.md).
+
+## 빠른 시작 (개발, 컨테이너 없이)
 
 ```bash
 cd backend && cp ../.env.example .env && uv sync && uv run alembic upgrade head
@@ -33,7 +44,7 @@ uv run uvicorn app.main:app --reload --port 8000
 | 단계 | 상태 |
 |---|---|
 | STEP 01 오디오 출력 + MPD + 상태·제어 API + 관리자 화면 | 개발 환경 완료, 강의실 현장 검증 대기 |
-| STEP 02 회원가입·가입 승인·곡 신청 | 예정 |
+| STEP 02 회원가입·가입 승인·곡 신청·음원 등록·대기열 + Docker | 완료(노트북 검증 대기) |
 | STEP 03 플레이리스트·자동 스케줄·페이드 | 예정 |
 
 ## 원칙

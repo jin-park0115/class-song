@@ -3,6 +3,7 @@
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', path='deck.css') }}">{% endblock %}
 {% block bodyclass %}deck-page{% endblock %}
 {% block topbar %}
+<a class="btn small" href="/admin/manage">관리 <span class="count" id="manage-count"></span></a>
 <span class="spacer"></span>
 <span id="who" class="muted"></span>
 <button id="logout" class="btn small">로그아웃</button>
@@ -152,7 +153,11 @@
           <button class="pad blue" data-action="next">NEXT</button>
           <button class="pad orange" data-action="stop">STOP</button>
           <button class="pad" data-toggle>▶❚❚</button>
+          {% if monitor_stream_url %}
+          <button class="pad listen" data-listen aria-pressed="false" title="이 기기 스피커로 듣기(모니터 스트림)">LISTEN</button>
+          {% else %}
           <button class="pad" data-refresh>SYNC</button>
+          {% endif %}
         </div>
         <div class="bigbtns">
           <button class="bigbtn cue" data-action="stop" aria-label="정지">CUE</button>
@@ -162,10 +167,12 @@
     </section>
   </div>
 
+  {% if monitor_stream_url %}<audio id="monitor" preload="none" data-src="{{ monitor_stream_url }}"></audio>{% endif %}
   <p class="legend muted small">
     상태: <b id="state-text">확인 중…</b> ·
     출력 <span id="outputs-legend">—</span> ·
     GAIN·TREBLE·BASS 등 회색 노브는 장식이며 동작하지 않습니다.
+    {% if monitor_stream_url %}· LISTEN: 이 기기로 듣기(몇 초 늦게 들려요){% endif %}
   </p>
 </div>
 {% endblock %}

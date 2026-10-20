@@ -203,3 +203,22 @@ def test_play_at_validation(admin_client, body):
 def test_play_at_out_of_range(admin_client):
     res = admin_client.post("/api/player/control", json={"action": "play_at", "position": 9})
     assert res.status_code == 422 and res.json()["error"]["code"] == "INVALID_POSITION"
+
+
+def test_monitor_disabled_by_default(admin_client):
+    res = admin_client.get("/api/player/monitor")
+    assert res.status_code == 404 and res.json()["error"]["code"] == "MONITOR_DISABLED"
+
+
+def test_monitor_admin_only(client, make_user):
+    make_user("student01")
+    login(client, "student01")
+    assert client.get("/api/player/monitor").status_code == 403
+
+
+def test_monitor_upstream_down(admin_client, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "mpd_monitor_url", "http://127.0.0.1:9/")
+    res = admin_client.get("/api/player/monitor")
+    assert res.status_code == 503 and res.json()["error"]["code"] == "MONITOR_UNAVAILABLE"

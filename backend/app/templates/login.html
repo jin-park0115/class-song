@@ -11,6 +11,7 @@
     <p id="login-error" class="alert" role="alert" hidden></p>
     <button type="submit" class="btn primary wide">로그인</button>
   </form>
+  <p class="muted small center-text">처음이신가요? <a href="/signup">회원가입</a></p>
 </section>
 {% endblock %}
 {% block scripts %}
@@ -20,11 +21,11 @@
     const err = document.getElementById("login-error");
     err.hidden = true;
     try {
-      await api.post("/api/auth/login", {
+      const me = await api.post("/api/auth/login", {
         login_id: document.getElementById("login_id").value,
         password: document.getElementById("password").value,
       });
-      location.href = "/admin";
+      location.href = api.homeFor(me);
     } catch (ex) {
       err.textContent = ex.message;
       err.hidden = false;

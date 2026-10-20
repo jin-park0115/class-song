@@ -6,6 +6,7 @@ MPD 연결은 하나만 유지하고, 모든 명령은 락으로 직렬화한다
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -184,6 +185,28 @@ class PlayerController:
             return [_song(i) for i in c.playlistinfo()[:limit]]
 
         return self._call(_read)
+
+    def add_to_queue(self, uri: str, scan_timeout: float = 10.0) -> None:
+        """새로 저장한 파일을 MPD 라이브러리에 반영(update)한 뒤 대기열 끝에 추가한다.
+
+        update 는 비동기라서 끝날 때까지 기다린다. 기다리는 동안 락을 잡지 않아 상태 조회는 계속된다.
+        """
+        self._call(lambda c: c.update(uri))
+        deadline = time.monotonic() + scan_timeout
+        while "updating_db" in self._call(lambda c: c.status()):
+            if time.monotonic() > deadline:
+                raise PlayerError(504, "MPD_SCAN_TIMEOUT", "MPD가 새 파일을 아직 인식하지 못했습니다. 잠시 후 다시 시도하세요.")
+            time.sleep(0.1)
+        self._call(lambda c: c.add(uri))
+
+    def remove_at(self, position: int) -> None:
+        def _remove(c: MPDClient) -> None:
+            length = _int(c.status().get("playlistlength")) or 0
+            if not 0 <= position < length:
+                raise PlayerError(422, "INVALID_POSITION", "대기열에 없는 곡 위치입니다.")
+            c.delete(position)
+
+        self._call(_remove)
 
     # ---- 제어 -------------------------------------------------------------
 

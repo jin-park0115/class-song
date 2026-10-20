@@ -22,6 +22,8 @@
   const songName = (s) => (s.artist ? `${s.artist} - ${s.title}` : s.title);
 
   function paintArt(el, song) {
+    el.style.backgroundImage = "";
+    el.classList.remove("has-img");
     if (!song) {
       el.textContent = "";
       el.style.removeProperty("--h");
@@ -32,6 +34,11 @@
     for (const ch of key) h = (h * 31 + ch.codePointAt(0)) % 360;
     el.style.setProperty("--h", h);
     el.textContent = (song.title || "?").trim().charAt(0).toUpperCase();
+    if (song.thumbnail_url) {
+      // 썸네일을 못 불러와도(인터넷 없음) 아래 그라데이션이 보인다
+      el.style.backgroundImage = `url("${encodeURI(song.thumbnail_url)}"), linear-gradient(135deg, hsl(${h} 70% 58%), hsl(${h + 50} 65% 38%))`;
+      el.classList.add("has-img");
+    }
   }
 
   function showError(msg) {
@@ -126,7 +133,12 @@
       play.addEventListener("click", () => control({ action: "play_at", position: song.position }));
       const when = document.createElement("span");
       when.className = "when";
-      li.append(idx, art, name, play, when);
+      const remove = document.createElement("button");
+      remove.className = "row-remove";
+      remove.textContent = "✕";
+      remove.setAttribute("aria-label", `${songName(song)} 대기열에서 빼기`);
+      remove.addEventListener("click", () => removeAt(song.position, songName(song)));
+      li.append(idx, art, name, play, when, remove);
       return li;
     });
     list.replaceChildren(...rows);
@@ -169,7 +181,9 @@
   }
 
   async function applyStatus(st) {
+    const wasPlaying = status && status.state === "play";
     status = st;
+    if (monitor && listening && st.state === "play" && (!wasPlaying || monitor.paused)) connectMonitor();
     statusAt = Date.now();
     if (st.connected && st.queue_version !== queueVersion) {
       queueVersion = st.queue_version;
@@ -198,6 +212,50 @@
     } catch (ex) {
       if (!handleAuth(ex)) showError(ex.message);
     }
+  }
+
+  async function removeAt(position, name) {
+    if (!confirm(`'${name}'을(를) 대기열에서 뺄까요?`)) return;
+    try {
+      await api.del(`/api/admin/queue/${position}`);
+      await refresh();
+    } catch (ex) {
+      if (!handleAuth(ex)) showError(ex.message);
+    }
+  }
+
+  // ── LISTEN: MPD httpd 출력을 이 기기에서 듣기(노트북 테스트용) ─────
+  const monitor = $("monitor");
+  let listening = false;
+  let retryTimer;
+
+  function connectMonitor() {
+    clearTimeout(retryTimer);
+    monitor.src = `${monitor.dataset.src}${monitor.dataset.src.includes("?") ? "&" : "?"}t=${Date.now()}`;
+    monitor.play().catch(() => {});
+  }
+
+  function setListening(on) {
+    listening = on;
+    document.querySelectorAll("[data-listen]").forEach((b) => b.setAttribute("aria-pressed", String(on)));
+    if (on) connectMonitor();
+    else {
+      clearTimeout(retryTimer);
+      monitor.pause();
+      monitor.removeAttribute("src");
+      monitor.load();
+    }
+  }
+
+  if (monitor) {
+    // 정지·일시정지하면 MPD가 스트림을 끊으므로, 다시 재생되면 자동으로 붙는다
+    const retry = () => {
+      if (listening) retryTimer = setTimeout(() => status && status.state === "play" ? connectMonitor() : retry(), 2000);
+    };
+    monitor.addEventListener("error", retry);
+    monitor.addEventListener("ended", retry);
+    monitor.addEventListener("stalled", retry);
+    document.querySelectorAll("[data-listen]").forEach((b) => b.addEventListener("click", () => setListening(!listening)));
   }
 
   function toggle() {
@@ -321,6 +379,19 @@
       $("who").textContent = `${me.name} (${me.login_id})`;
       await refresh();
       setInterval(refresh, POLL_MS);
+      const updateTodo = async () => {
+        try {
+          const [u, r] = await Promise.all([
+            api.get("/api/admin/users?status=PENDING_APPROVAL"),
+            api.get("/api/admin/requests?status=PENDING"),
+          ]);
+          const n = u.items.length + r.items.length;
+          $("manage-count").textContent = n || "";
+          $("manage-count").title = n ? `가입 대기 ${u.items.length} · 신청 대기 ${r.items.length}` : "";
+        } catch {}
+      };
+      updateTodo();
+      setInterval(updateTodo, 15000);
       setInterval(tick, 1000);
     } catch (ex) {
       if (!handleAuth(ex)) showError(ex.message);
