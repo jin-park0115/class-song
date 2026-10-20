@@ -1,0 +1,23 @@
+# 비밀값
+.env
+*.env
+!.env.example
+
+# 음원·DB 덤프·임시 다운로드(요구사항 13장)
+*.mp3
+*.ogg
+*.flac
+*.wav
+media/
+*.dump
+*.sql.gz
+downloads/
+*.part
+
+# 개발 산출물
+.dev/
+.dev-*.log
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/

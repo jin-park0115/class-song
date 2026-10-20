@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# 관리자 계정 CLI 래퍼. 예: scripts/jukebox-admin create --login-id admin --name 운영자
+set -euo pipefail
+cd "$(dirname "$0")/../backend"
+exec uv run --quiet python -m app.cli "$@"

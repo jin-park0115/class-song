@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}운영 대시보드 · AX2 Jukebox{% endblock %}
+{% block topbar %}
+<span class="spacer"></span>
+<span id="who" class="muted"></span>
+<button id="logout" class="btn small">로그아웃</button>
+{% endblock %}
+{% block content %}
+<p id="page-error" class="alert" role="alert" hidden></p>
+
+<section class="card emergency">
+  <button id="emergency" class="btn danger wide" aria-describedby="emergency-help">■ 비상 정지</button>
+  <p id="emergency-help" class="muted small">페이드 없이 즉시 재생을 멈춥니다.</p>
+</section>
+
+<section class="card">
+  <div class="row between">
+    <h2>지금 재생</h2>
+    <span id="state-badge" class="badge">확인 중…</span>
+  </div>
+  <p id="current-title" class="title">—</p>
+  <p id="current-artist" class="muted">&nbsp;</p>
+  <div class="progress" role="progressbar" aria-label="재생 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div id="progress-bar"></div>
+  </div>
+  <p class="row between small muted"><span id="elapsed">0:00</span><span id="remaining">-0:00</span></p>
+  <p class="small">다음 곡: <span id="next-title">—</span></p>
+
+  <div class="controls" role="group" aria-label="재생 제어">
+    <button class="btn primary" data-action="play">▶ 재생</button>
+    <button class="btn" data-action="pause">❚❚ 일시정지</button>
+    <button class="btn" data-action="resume">⏵ 이어 재생</button>
+    <button class="btn" data-action="next">⏭ 다음 곡</button>
+    <button class="btn" data-action="stop">■ 정지</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="row between">
+    <h2>볼륨</h2>
+    <span class="muted small">최대 상한 <strong id="max-volume">—</strong>%</span>
+  </div>
+  <div class="row">
+    <input id="volume" type="range" min="0" max="100" step="1" aria-label="볼륨" aria-describedby="volume-value">
+    <output id="volume-value" for="volume">—</output>
+    <button id="mute" class="btn small" aria-pressed="false">음소거</button>
+  </div>
+  <p id="volume-note" class="muted small" aria-live="polite"></p>
+</section>
+
+<section class="card">
+  <h2>시스템 상태</h2>
+  <dl class="status-list">
+    <dt>MPD 연결</dt><dd id="mpd-conn">—</dd>
+    <dt>오디오 출력</dt><dd id="outputs">—</dd>
+    <dt>대기열</dt><dd id="queue">—</dd>
+    <dt>오류</dt><dd id="player-error">없음</dd>
+    <dt>마지막 갱신</dt><dd id="updated">—</dd>
+  </dl>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', path='admin.js') }}"></script>
+{% endblock %}

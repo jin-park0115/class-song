@@ -1,0 +1,26 @@
+# /etc/systemd/system/ax2-jukebox-api.service
+# 설치: sudo cp deploy/systemd/ax2-jukebox-api.service /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now ax2-jukebox-api
+[Unit]
+Description=AX2 Classroom Jukebox API
+After=network-online.target postgresql.service mpd.service
+Wants=network-online.target
+
+[Service]
+User=jukebox
+Group=jukebox
+WorkingDirectory=/opt/ax2-jukebox/backend
+EnvironmentFile=/etc/ax2-jukebox/env
+# 워커는 반드시 1개. PlayerController(MPD 연결·음소거 상태)는 프로세스 안에 하나만 있어야 한다.
+ExecStart=/opt/ax2-jukebox/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/ax2-jukebox
+
+[Install]
+WantedBy=multi-user.target
