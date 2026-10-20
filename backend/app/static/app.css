@@ -200,12 +200,13 @@ select {
 
 /* ── 목록 ───────────────────────────────────────────── */
 .tracklist, .library { list-style: none; margin: 0; padding: 0; }
-.tracklist > li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border); }
+.tracklist > li { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border); }
 .tracklist > li:first-child { border-top: 0; }
-.tl-body { flex: 1; min-width: 0; }
+/* 본문은 최소 12rem 을 지키고, 자리가 모자라면 배지·버튼(tl-side)이 다음 줄 오른쪽으로 내려간다 */
+.tl-body { flex: 1 1 12rem; min-width: 0; }
 .tl-body p { margin: 0 0 2px; overflow-wrap: anywhere; }
 .tl-title { font-weight: 600; }
-.tl-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+.tl-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; margin-left: auto; }
 .actions, .review, .step-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .review { margin-top: 8px; }
 .review input { flex: 1; min-width: 140px; padding: 6px 10px; }
@@ -220,8 +221,9 @@ select {
 .tabs button:focus-visible { outline: 3px solid var(--primary); }
 .lib-item { padding: 14px 0; border-top: 1px solid var(--border); }
 .lib-item:first-child { border-top: 0; }
-.lib-head { display: flex; gap: 12px; align-items: flex-start; }
-.lib-head .tl-side { flex-direction: row; }
+.lib-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.lib-head .tl-side { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+.lib-item > :not(.lib-head) { margin-top: 10px; }
 .steps { list-style: none; margin: 10px 0 0 60px; padding: 0; display: grid; gap: 8px; }
 .steps > li { display: grid; grid-template-columns: 6.5em 1fr; gap: 8px; align-items: center; font-size: .9rem; }
 .step-row input:not([type="file"]) { flex: 1; min-width: 140px; padding: 6px 10px; }
@@ -235,7 +237,6 @@ select {
   .steps > li { grid-template-columns: 1fr; }
   .np-thumb { width: 72px; }
   .preview-thumb { width: 96px; }
-  .tracklist > li { flex-wrap: wrap; }
   .tl-side { flex-direction: row; width: 100%; justify-content: flex-end; }
   .search { max-width: 140px; }
 }
